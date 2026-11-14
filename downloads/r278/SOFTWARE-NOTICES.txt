@@ -1,0 +1,62 @@
+# AlekS DTS R278 software notices
+
+Copyright (c) 2026 AlekS / GameFree24 (@aerolit266).
+
+## AlekS binary license
+
+These terms apply to the R239 GStreamer wrapper binary
+(plugins/libgstaleksdts16dec.so) distributed in AlekS DTS R278.
+The LGPL string in its GStreamer plugin metadata is a historical
+identifier in this build. The AlekS copyright holder authorizes
+distribution of this specific binary under these terms. Earlier
+copies retain any rights already granted under their licenses.
+
+You may download, install and use the binary on televisions you
+own or are authorized to administer. You may modify the combined
+work for your own use and reverse engineer it to debug those
+modifications. These terms do not limit rights granted under
+third-party licenses or applicable law.
+
+THE BINARY IS PROVIDED "AS IS", WITHOUT WARRANTY, TO THE EXTENT
+PERMITTED BY APPLICABLE LAW.
+
+## MIT notice for AlekS integration components
+
+The MIT option applies to the AlekS-authored R130 parser
+(libgstaleksdtsr130optin.so), R56 caps adapter
+(libgstaleksdtscaps.so), and R56 decoder adapter
+(gstaleksdtsdec.o, also incorporated in libgstaleksdts.so).
+The MIT notice does not cover libdcadec or R239.
+
+Copyright (c) 2026 AlekS / GameFree24 (@aerolit266)
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+## Third-party libraries
+
+libgstaleksdts.so includes libdcadec under LGPL-2.1-or-later.
+See COPYING.LGPLv2.1 in the installation archive. The corresponding
+libdcadec source, copyright notices and the relinkable AlekS adapter
+object are available as R278-R56-LGPL-RELINK.tar.gz alongside the
+installation archive. See README.txt in that archive for instructions.
+
+The plugins dynamically use GStreamer and GLib from the target TV.
+Those libraries retain their upstream licenses and are not distributed
+in this release. DTS and LG names identify the format and target device.

@@ -2,7 +2,7 @@
 
 [Русский](README.md) · [Documentation license](LICENSE.md)
 
-> **Installation status.** R277 works on the test LG 65NANO896PC. Self-service installation from GitHub is not available yet. [Details](#installation)
+> **R278 is available** for LG 65NANO896PC running firmware 03.60.96. [Installation command](#installation)
 
 **AlekS DTS R277** adds DTS Core decoding to the native LG webOS media pipeline. Support loads automatically when the TV starts. For the tested DTS 5.1 track, the native audio sink received six-channel PCM S16LE at 48 kHz.
 
@@ -29,14 +29,29 @@ Before installing, open a local MKV with a known DTS Core track in the built-in 
 
 ## Installation
 
-**R277 cannot currently be installed from this repository.** A one-command installation is being prepared for R278. After release, open a root SSH session on the TV, paste the command from the release page, and wait for confirmation. Fully reboot the TV, then select a DTS Core audio track in your player. The command will download the prebuilt archive and verify its SHA‑256 checksum. The archive and command have yet to be published.
+Set up root SSH and Homebrew on **LG 65NANO896PC running firmware 03.60.96 and webOS TV 6.6.0**. Open an SSH session on the TV and paste the full block. When you see `R278 configured`, fully reboot the TV.
 
-To check whether your TV is a candidate, open a [compatibility request](https://github.com/aerolit266/AlekS-DTS-webOS/issues/new) and include:
+```sh
+(
+  set -eu
+  [ "$(id -u)" = 0 ] || { echo 'Root SSH is required.' >&2; exit 1; }
+  [ "$(uname -m)" = armv7l ] || { echo 'This release requires ARMv7.' >&2; exit 1; }
+  stage=$(mktemp -d /tmp/aleks-dts-download.XXXXXX)
+  trap 'rm -rf -- "$stage"' EXIT
+  cd "$stage"
+  curl -fLsS --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 120 \
+    -o release.tar.gz 'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/main/downloads/r278/AlekS-DTS-R278-65NANO896PC-03.60.96.tar.gz'
+  printf '%s  %s\n' 'cafb3e014f407a4a0dda6bd50a0e4f983aa0b35ea1f53e705f504aed0a094ea1' release.tar.gz | sha256sum -c -
+  tar -xmzf release.tar.gz
+  sh ./install.sh install
+)
+```
 
-- the exact LG model;
-- the firmware and webOS versions shown in the TV information screen;
-- whether the built-in player produces sound from an MKV with DTS Core audio.
+To roll back, run `sh /var/lib/webosbrew/aleks-dts-r278/install.sh rollback` and fully reboot the TV.
 
-The R278 installer passed testing on an LG 65NANO896PC running firmware 03.60.96 with root access already configured. The TV booted after installation on a clean media-server configuration, played a DTS 5.1 clip to the end, and passed the cable TV checks before and after playback. The installer targets LG 65NANO896PC running firmware 03.60.96 and webOS TV 6.6.0. The distribution package is being prepared with the applicable component licenses.
+[Installer archive](downloads/r278/AlekS-DTS-R278-65NANO896PC-03.60.96.tar.gz) · [SHA‑256](downloads/r278/SHA256SUMS) · [Software notices](downloads/r278/SOFTWARE-NOTICES.txt) · [libdcadec and relinking kit](downloads/r278/R278-R56-LGPL-RELINK.tar.gz)
+
+The original installer was tested with a clean media-server configuration. The stripped plugins in the public package passed isolated DTS 2.0, DTS 5.1 and AC3 tests on the same LG. For another model or firmware, open a [compatibility request](https://github.com/aerolit266/AlekS-DTS-webOS/issues/new).
+
 
 © 2026 AlekS / GameFree24 (@aerolit266). [Documentation terms](LICENSE.md).
