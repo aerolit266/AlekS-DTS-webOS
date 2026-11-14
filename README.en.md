@@ -37,6 +37,6 @@ To check whether your TV is a candidate, open a [compatibility request](https://
 - the firmware and webOS versions shown in the TV information screen;
 - whether the built-in player produces sound from an MKV with DTS Core audio.
 
-When a public package is available, this section will contain the download link, the exact installation command and the rollback command. Installation from scratch has yet to be verified. The test TV already had root access and the R56 decoder.
+The R278 installer candidate targets a TV with root access already configured. Isolated DTS and rollback checks passed on the LG 65NANO896PC. A first normal boot following installation on a clean media-server configuration remains to be verified. The download link and exact install and rollback commands will appear here when the package is ready to distribute.
 
 © 2026 AlekS / GameFree24 (@aerolit266). [Documentation terms](LICENSE.md).
