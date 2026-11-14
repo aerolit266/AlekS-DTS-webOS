@@ -1,0 +1,31 @@
+name: Attach verified R278 release files
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/attach-r278-assets.yml
+permissions:
+  contents: write
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify tagged files and upload missing assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          base=https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/7fedf2212d1d0b85e82cd38eeb954d2fea4b1ae5/downloads/r278
+          files=(AlekS-DTS-R278-65NANO896PC-03.60.96.tar.gz R278-R56-LGPL-RELINK.tar.gz SOFTWARE-NOTICES.txt SHA256SUMS)
+          for file in "${files[@]}"; do
+            curl -fLsS --proto '=https' --max-time 30 "$base/$file" -o "$file"
+          done
+          sha256sum -c SHA256SUMS
+          existing=$(gh release view r278 --json assets --jq '.assets[].name')
+          for file in "${files[@]}"; do
+            if ! grep -Fxq "$file" <<< "$existing"; then
+              gh release upload r278 "$file"
+            fi
+          done
