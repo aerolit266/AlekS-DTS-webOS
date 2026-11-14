@@ -40,7 +40,7 @@ DTS Core 2.0 и 5.1 также прошли изолированные тест�
   trap 'rm -rf -- "$stage"' EXIT
   cd "$stage"
   curl -fLsS --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 120 \
-    -o release.tar.gz 'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/main/downloads/r278/AlekS-DTS-R278-65NANO896PC-03.60.96.tar.gz'
+    -o release.tar.gz 'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/r278/downloads/r278/AlekS-DTS-R278-65NANO896PC-03.60.96.tar.gz'
   printf '%s  %s\n' 'cafb3e014f407a4a0dda6bd50a0e4f983aa0b35ea1f53e705f504aed0a094ea1' release.tar.gz | sha256sum -c -
   tar -xmzf release.tar.gz
   sh ./install.sh install
@@ -49,7 +49,7 @@ DTS Core 2.0 и 5.1 также прошли изолированные тест�
 
 Для отката выполните `sh /var/lib/webosbrew/aleks-dts-r278/install.sh rollback` и полностью перезагрузите ТВ.
 
-[Установочный архив](downloads/r278/AlekS-DTS-R278-65NANO896PC-03.60.96.tar.gz) · [SHA‑256](downloads/r278/SHA256SUMS) · [Лицензии ПО](downloads/r278/SOFTWARE-NOTICES.txt) · [libdcadec и перелинковка](downloads/r278/R278-R56-LGPL-RELINK.tar.gz)
+[Установочный архив](https://github.com/aerolit266/AlekS-DTS-webOS/blob/r278/downloads/r278/AlekS-DTS-R278-65NANO896PC-03.60.96.tar.gz) · [SHA‑256](https://github.com/aerolit266/AlekS-DTS-webOS/blob/r278/downloads/r278/SHA256SUMS) · [Лицензии ПО](https://github.com/aerolit266/AlekS-DTS-webOS/blob/r278/downloads/r278/SOFTWARE-NOTICES.txt) · [libdcadec и перелинковка](https://github.com/aerolit266/AlekS-DTS-webOS/blob/r278/downloads/r278/R278-R56-LGPL-RELINK.tar.gz)
 
 Оригинальный установщик проверен на чистой конфигурации медиасервера. Очищенные плагины из публичного комплекта прошли изолированные тесты DTS 2.0, DTS 5.1 и AC3 на том же LG. Если модель или прошивка отличаются, укажите их в [запросе совместимости](https://github.com/aerolit266/AlekS-DTS-webOS/issues/new).
 

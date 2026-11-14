@@ -40,7 +40,7 @@ Set up root SSH and Homebrew on **LG 65NANO896PC running firmware 03.60.96 and w
   trap 'rm -rf -- "$stage"' EXIT
   cd "$stage"
   curl -fLsS --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 120 \
-    -o release.tar.gz 'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/main/downloads/r278/AlekS-DTS-R278-65NANO896PC-03.60.96.tar.gz'
+    -o release.tar.gz 'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/r278/downloads/r278/AlekS-DTS-R278-65NANO896PC-03.60.96.tar.gz'
   printf '%s  %s\n' 'cafb3e014f407a4a0dda6bd50a0e4f983aa0b35ea1f53e705f504aed0a094ea1' release.tar.gz | sha256sum -c -
   tar -xmzf release.tar.gz
   sh ./install.sh install
@@ -49,7 +49,7 @@ Set up root SSH and Homebrew on **LG 65NANO896PC running firmware 03.60.96 and w
 
 To roll back, run `sh /var/lib/webosbrew/aleks-dts-r278/install.sh rollback` and fully reboot the TV.
 
-[Installer archive](downloads/r278/AlekS-DTS-R278-65NANO896PC-03.60.96.tar.gz) · [SHA‑256](downloads/r278/SHA256SUMS) · [Software notices](downloads/r278/SOFTWARE-NOTICES.txt) · [libdcadec and relinking kit](downloads/r278/R278-R56-LGPL-RELINK.tar.gz)
+[Installer archive](https://github.com/aerolit266/AlekS-DTS-webOS/blob/r278/downloads/r278/AlekS-DTS-R278-65NANO896PC-03.60.96.tar.gz) · [SHA‑256](https://github.com/aerolit266/AlekS-DTS-webOS/blob/r278/downloads/r278/SHA256SUMS) · [Software notices](https://github.com/aerolit266/AlekS-DTS-webOS/blob/r278/downloads/r278/SOFTWARE-NOTICES.txt) · [libdcadec and relinking kit](https://github.com/aerolit266/AlekS-DTS-webOS/blob/r278/downloads/r278/R278-R56-LGPL-RELINK.tar.gz)
 
 The original installer was tested with a clean media-server configuration. The stripped plugins in the public package passed isolated DTS 2.0, DTS 5.1 and AC3 tests on the same LG. For another model or firmware, open a [compatibility request](https://github.com/aerolit266/AlekS-DTS-webOS/issues/new).
 
