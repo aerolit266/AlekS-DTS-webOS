@@ -97,6 +97,16 @@ ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubuse
 
 **Уточнено по `/proc/self/mountinfo` (22.11.2026):** `/` — read-only SquashFS; на `/var` сначала виден нижний read-only OverlayFS (`lowerdir=/overlay/bsppart/bsp/var:/var`), но поверх него смонтирован **read-write ext4 с физической eMMC `/dev/mmcblk0p59`** (mount ID 71, root `/var`). `/var/lib/webosbrew` использует это действующее монтирование; свободно ~561 МБ. **Это постоянный блочный накопитель, не RAM**. Сохранение конфигурации после полного перезапуска всё ещё следует подтвердить, поскольку процессы инициализации могут удалять временные каталоги. В PREVIEW добавлена блокирующая проверка действующего монтирования `/var` перед установкой.
 
+**Первый полевой тест установки и отката R279-кандидата (22.11.2026, LG 43NANO85A6A):** режим `install CONFIRM-LG-43NANO85A6A` сообщил `R278 configured`, затем SHA256 `installed.env`, `combined.reg` и четырёх установленных плагинов прошли, точное совпадение `umediaserver.env` подтверждено, итог `RESULT=INSTALLED_PENDING_FULL_REBOOT_AND_NATIVE_PLAYER_TEST`. Сразу после этого владелец выполнил `sh /var/lib/webosbrew/aleks-dts-r278/install.sh rollback` и получил **`Rollback verified. Fully reboot the TV.`**. Следовательно, конфигурация медиасервиса **восстановлена**, а бинарники и данные восстановления остались на диске; штатный плеер после перезагрузки **не проверен**. Нельзя объявлять DTS уже работающим в системном плеере или выпускать эту сборку для всех LG.
+
+**После отката не повторять установку командой R279-кандидата:** путь `/var/lib/webosbrew/aleks-dts-r278` уже существует и защита установщика остановит повторную подготовку. Если потребуется вновь активировать ранее проверенную конфигурацию, используйте восстановление через сохранённый `install.sh` после проверки состояния. Read-only статус:
+
+```powershell
+ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/acfa9927bf9958f329f10fadb40976d6603c204d/tools/check-webos26-r279-state.sh -o /tmp/aleks-dts-state.sh && echo 'a6ea46d67ba37cd594f28d15ce2f43fe14a40f229aa092ac13744eeca0f64013  /tmp/aleks-dts-state.sh' | sha256sum -c - && sh /tmp/aleks-dts-state.sh"
+```
+
+Ожидаемое состояние сразу после корректного отката с изначально отсутствовавшим `umediaserver.env`: `RESULT=ROLLED_BACK_CONFIGURATION; PLUGINS_RETAINED; REBOOT_NOT_VERIFIED`. При несовпадении состояния повторное включение **запрещено** до диагностики.
+
 ### Установщик для кухонного LG (PREVIEW, без переключения медиаслужбы)
 
 Для **LG 43NANO85A6A, прошивка 43.22.74** подготовлена отдельная обёртка над подписанным SHA256 архивом R278. Она проверяет реальный ELF32 ARM пользовательского медиатракта, GStreamer 1.24.10, совместимость BusyBox, DTS Core 2.0/5.1, программный AC3 и текущую конфигурацию `umediaserver`. Исходная логика резервной копии `umediaserver.env` и отката R278 сохранена.
