@@ -97,6 +97,16 @@ Even `RESULT=PREFLIGHT_READY_FOR_BACKUP_AND_STAGED_TEST; NO_INSTALL` is **not in
 
 **Confirmed from `/proc/self/mountinfo` (2026-11-22):** `/` is read-only SquashFS; `/var` first has a lower read-only OverlayFS (`lowerdir=/overlay/bsppart/bsp/var:/var`), but a **writable ext4 mount backed by physical eMMC `/dev/mmcblk0p59`** overrides it (mount ID 71, root `/var`). `/var/lib/webosbrew` uses the effective mounted storage; around 561 MB is available. **This is persistent block storage, not RAM**. Persistence of particular files after a full reboot is still to be confirmed because boot maintenance may clean temporary directories. The PREVIEW installer now blocks activation if this effective `/var` mount differs.
 
+**First R279-candidate install/rollback field test (2026-11-22, LG 43NANO85A6A):** `install CONFIRM-LG-43NANO85A6A` reached `R278 configured`, checked SHA256 for `installed.env`, `combined.reg`, and the four installed plugins, and confirmed the live `umediaserver.env` matched the generated configuration exactly. Final install output: `RESULT=INSTALLED_PENDING_FULL_REBOOT_AND_NATIVE_PLAYER_TEST`. The owner **immediately rolled back** using `sh /var/lib/webosbrew/aleks-dts-r278/install.sh rollback` and received **`Rollback verified. Fully reboot the TV.`**. Thus the media environment configuration was restored; installed binary and recovery artifacts remain. There is **no post-reboot native-player DTS test**. This is not proof of full native DTS support and not a general LG release.
+
+**Do not rerun the R279-candidate install command after rollback:** its target directory now exists, so the safety guard blocks a second staging operation. For a later re-enable, first inspect the on-device state. Read-only status:
+
+```powershell
+ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/acfa9927bf9958f329f10fadb40976d6603c204d/tools/check-webos26-r279-state.sh -o /tmp/aleks-dts-state.sh && echo 'a6ea46d67ba37cd594f28d15ce2f43fe14a40f229aa092ac13744eeca0f64013  /tmp/aleks-dts-state.sh' | sha256sum -c - && sh /tmp/aleks-dts-state.sh"
+```
+
+Expected immediately after rollback when the original `umediaserver.env` did not exist: `RESULT=ROLLED_BACK_CONFIGURATION; PLUGINS_RETAINED; REBOOT_NOT_VERIFIED`. Block re-enabling if the actual state differs.
+
 ### Kitchen LG dedicated installer (PREVIEW, no media service changes)
 
 For **LG 43NANO85A6A, firmware 43.22.74**, a dedicated frontend adapts the SHA256-pinned R278 archive. It verifies actual media ELF32 ARM, GStreamer 1.24.10, BusyBox timeout compatibility, DTS Core stereo/5.1, software AC3 and current `umediaserver` configuration. Original R278 environment-backup and rollback logic is retained.
