@@ -43,10 +43,12 @@ Open root SSH on an LG ARMv7 TV and paste the full block. It downloads the pinne
   curl -fLsS --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 60 \
     -o "$stage/install-universal.sh" \
     'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/main/install-universal.sh'
-  printf '%s  %s\n' 'c499c9266d175301b48574dbef604b59b40b8d4ba529808fcac6bb1ea4bdbab2' "$stage/install-universal.sh" | sha256sum -c -
+  printf '%s  %s\n' 'fa674ae01a879f96c10652592c3da987640c34efa2b50a0119133acb7f3ffb3f' "$stage/install-universal.sh" | sha256sum -c -
   sh "$stage/install-universal.sh" install
 )
 ```
+
+**Media configuration compatibility:** the installer detects `umediaserver.env` from the actual `EnvironmentFiles` entry of `umediaserver.service`, instead of assuming the path from a single LG model. A missing directory is created only when that path is declared by the service and its root-owned parent exists. Other service layouts are not modified automatically. To diagnose, download the script and run `sh /tmp/aleks-dts-universal.sh diagnose`.
 
 **Verify without installing:** change the last `install` argument to `verify`. The isolated decoding tests do not modify the media-service configuration. On an untested model, run `verify` first.
 
