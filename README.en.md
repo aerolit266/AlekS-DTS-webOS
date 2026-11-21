@@ -24,16 +24,20 @@ DTS Core 2.0 and 5.1 also passed isolated tests. DTS-HD MA, DTS:X, DTS passthrou
 | LG 65NANO896PC · 03.60.96 · webOS TV 6.6.0 · ARMv7 · GStreamer 1.16.2 | DTS Core 5.1 verified on real hardware |
 | LG UP75006LF · ARMv7 · R278 | **Installation and DTS playback confirmed by owner:** `R278 configured`, isolated DTS 2.0 / DTS 5.1 / AC3 tests PASS, and owner reports everything working after installation. Separate Live TV regression results and persistence across multiple reboots are not documented |
 | Other LG ARMv7 TVs with native umediaserver / GStreamer | No model or firmware lock. The installer runs isolated DTS 2.0, DTS 5.1 and AC3 tests before enabling. Native-player playback still needs device-specific verification |
-| LG ARM64 or other architectures | Not supported by existing R278 binary plugins; requires a separate build |
+| 64-bit Linux kernel + 32-bit ARM media userland (e.g. LG 43NANO85A6A, webOS 26) | Never infer plugin ABI from `uname -m`: inspect ELF class and e_machine for umediaserver and GStreamer. R278 targeting GStreamer 1.16.2 is **untested** against GStreamer 1.24.10 and is rejected by the current installer |\n| 64-bit native media process / different CPU ABI | Requires a build matching the actual native media process ABI |
 | Different media pipeline/ABI, or modified media configuration | Installer must refuse before changing media-service configuration |
 
 Root SSH and an existing Homebrew setup are required. No system libraries or firmware are replaced. A successful isolated GStreamer test does not guarantee correct sound on every built-in player.
 
 Test a DTS Core file in the native player first; your TV may already support it.
 
-## webOS 26 / ARM64: migration from DTS Restore
+## webOS 26: ARM32 media userland on a 64-bit kernel
 
-**Do not install the ARMv7 R278 package on ARM64.** Keep the working DTS Restore installation until a separate ARM64 build passes isolated tests. The newer GStreamer ABI requires a rebuilt plugin set and native-player validation.
+**Confirmed on LG 43NANO85A6A, firmware 43.22.74:** `uname -m = aarch64`, while `/usr/sbin/umediaserver` and `/usr/bin/gst-inspect-1.0` have ELF class `1` (32-bit) and little-endian encoding; GStreamer `1.24.10`, runtime `libgstreamer-1.0.so.0.2410.0`. Exact CPU ABI (ELF e_machine) and dynamic dependencies are not yet checked. **Do not build ARM64 plugins based solely on the kernel architecture**: plugins must match the 32-bit media process ABI and GStreamer 1.24.10.
+
+No `dtsdec`/`avdec_dca` element, matching DTS mounts or DTS Restore files in the tested standard locations were found. This does not prove that a nonstandard DTS Restore or built-in decoder is absent. No TV modifications were made.
+
+**Do not install R278:** its installer checks `uname -m = armv7l` and rejects a 64-bit kernel, while R278 plugin compatibility with GStreamer 1.24.10 is unverified. Do not disable gates. Backups, isolated tests, native-player and rollback validation are required before replacing any existing DTS solution.
 
 A read-only preflight is available. It changes no files, services or mounts:
 
@@ -44,7 +48,7 @@ printf '%s  %s\n' '2cb5b838ec0a89eed6b0a3003d75cb30e2f200d3a6003bf2aeefa90df8dc0
 sh /tmp/aleks-dts-probe.sh
 ```
 
-Use the output to determine the actual ABI, DTS Restore footprint and umediaserver configuration. Migration then requires a backup, ARM64 build, isolated DTS/AC3 tests and separate native-player, Live TV and rollback validation. **No ARM64 installer has been released yet.**
+Use the output to determine the actual ABI, DTS Restore footprint and umediaserver configuration. Migration then requires a backup, a build for the **actual 32-bit media ABI/GStreamer 1.24.10**, isolated DTS/AC3 tests, and native-player, Live TV and rollback validation. **No webOS 26 installer has been released yet.**
 
 ## Installation
 
