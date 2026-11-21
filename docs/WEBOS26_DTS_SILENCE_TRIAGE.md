@@ -264,3 +264,21 @@ The first R292 run incorrectly parsed `pactl list short sinks` due to the sample
 **Do not infer** either that (a) Starfish DTS necessarily flows through the WebAppMgr PulseAudio sink input, or that (b) it bypasses PulseAudio. Both could occur via IPC, shared buffers or separate proprietary DSP paths; current evidence only identifies independent process owners. Similarly `outputMode=null` is observed in a working session and cannot be used as a sole failure marker.
 
 **Root cause status:** first-open silence remains unexplained. A proper A/B failure capture would compare live Starfish decoder instance, native sink ownership, muting, and PCM sample flow before/after AC3 switching. Until reproduced, do not patch rank, DTS parser/decoder, S16/S32 converter, system services or first-track behavior speculatively. Acoustically verified output still derives from the owner's report, not the `pactl`/ALSA tests.
+
+## R293: PulseAudio native client enumeration (2026-11-22)
+
+Created [tools/inspect-webos26-pulse-clients-r293.sh](../tools/inspect-webos26-pulse-clients-r293.sh), GitHub commit `b6f2342d976e3faf93708f05c0ffc70f46708818`, SHA256 `7de436893ce9ab71cc972c08767b36f1ea784653900f938d077a800fa6ecce85`; source passed VPS `sh -n` and target SHA256. Executed read-only on kitchen LG via existing AlekS Core route.
+
+PulseAudio clients exposed via native socket `/var/run/pulse/native`:
+
+| Client | PID | Current process |
+| --- | ---: | --- |
+| #0 | 440 | `audiod` |
+| #5 | 3217 | `WebAppMgr` |
+| #18 | 32743 | Process already exited by time of `/proc` lookup; likely transient, unverified |
+
+**DTS plugin holder is a different process, Starfish PID 20727.** No PulseAudio client with PID20727 appeared in this `pactl list clients` snapshot. The only active `sink-input #5` also belongs to `WebAppMgr` PID3217 (R292). Thus **do not claim** a direct `starfish-media → PulseAudio` client connection or that ALSA PCM6 FIFO advancement exclusively measures decoded DTS samples. Data support process ownership and simultaneous live codec/output activity only. An indirect bridge through `audiod`, `audiooutputd`, WebAppMgr, IPC or DSP is possible but unverified.
+
+**R292 corrected source on LG** shows `pcm_output` sink #1 `module-alsa-sink.c`, `FORMAT=s16le 2ch 48000Hz`, `STATE=RUNNING` and its single active uncorked/unmuted input owned by WebAppMgr; read-only native LG audio service continues to report `source=ADEC0`, `sink=MAIN`, `muted=false`, `codec=dts`. No player interaction or system changes.
+
+**Next scientific gate:** only a captured failed first-start session, and comparison to this working topology, can justify an initialization change. A fully resolved data provenance would require target-specific native GStreamer audio sink tracing and/or safely instrumented IPC/PCM data path, not assumed from mapping, PIDs or hardware pointer movement. For now live DTS audible success is **owner-reported**, and all instrumented checks are non-acoustic.
