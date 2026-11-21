@@ -100,3 +100,13 @@ Owner executed `tools/test-webos26-decodebin3-pcm-r282.sh` on LG 43NANO85A6A. R2
 All four `decodebin3 ! fakesink` test cases reached EOS and reported no negotiation error, **but exited 143 after the 12-second timeout**. This is **not clean teardown**; it is potentially the known native OMX/decproxy shutdown stall. `exit 143` is `128 + SIGTERM(15)`; no evidence this signal arose *before* EOS. A clean-exit PASS must not be claimed. `tsinkbin` and `alsasink` factory available; ALSA advertises both S16LE and S32LE plus other formats, but these templates **do not describe the actual LG playback sink/resource path**.
 
 **Decision:** R281+R282 do not justify changing ranks: all isolated pipelines decode under rank 288/300. S32LE stereo conversion is technically feasible but real-audio efficacy remains untested. Prioritize actual uMS/Starfish audio resource acquisition, decoder instance, `audiooutputd` routing, playback track/caps and native sink; avoid production changes while diagnosis is incomplete.
+
+## R283 read-only hardware audio-route probe — staged
+
+The R282 field result isolates codec decoding from the real LG audio output. In webOS25's documented audio path, `decproxy` may require an `acquired-resource` grant from `umediaserver`; a `fakeadec` placeholder can cause silence after track switching. This is a **research-supported hypothesis** from a different LG model, not proof for 43NANO85A6A; see https://github.com/josippapez/dts_restore_plus/blob/main/webos25/README.md.
+
+Created [tools/diagnose-webos26-native-audio-route-r283.sh](../tools/diagnose-webos26-native-audio-route-r283.sh), GitHub `8ef36cf`, SHA256 `037b7394c68f78db3a465c02b37d42ec88a477f16aae83fafdc3aa3c408b20a4`, VPS shell syntax PASS. Run **while a native video pipeline is actively playing a selected DTS track**. It reports only plugin mappings, a SHA256 and keyword counts for LG's codec capability config, narrowly allowlisted fields from LG's documented read-only `getAudioInputProperty` API (if supported), and counts of recent `fakeadec`, `acquired-resource`, negotiation and resource errors in system journal. It does not alter TV sound or decode a synthetic signal and avoids disclosing the movie title or full LS payload.
+
+Interpretation: `CAPABILITY_REFERENCE_dts=0` may flag a missing uMS DTS resource declaration but is only a substring count, not definitive capability assessment. The LS audio-input-property API may describe the selected input instead of the app's audio stream. Zero journal counts may reflect absent logging. No production changes until decoded PCM and actual LG output path are linked by evidence.
+
+QA of R283 shell script performed on **VPS only**; fake/absent TV resources there are expected and **not kitchen test results**.
