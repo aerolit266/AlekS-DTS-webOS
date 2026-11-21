@@ -179,3 +179,25 @@ Additional **read-only hardware-level measurement via the existing AlekS Core �
 - Advancing hardware FIFO pointers **do not prove nonzero samples or audible speech**. Audible DTS remains reported by the owner, while remote evidence independently verifies an active PCM output contemporaneous with LG reporting `codec=dts`.
 
 **Next real defect capture:** if a first-start DTS silence recurs, run R286 **while silent** before AC3 switching. Compare state of the PCM6 output, owner PID, pointer movement, codec and starfish mapped plugins with this known-good snapshot. If PCM remains RUNNING and pointers advance even in silence, inspect sample contents/muting/routing under separate authorized, isolated controls; otherwise focus on output resource grant/creation. Do not force AC3 toggles, restart native services or patch firmware without root cause.
+
+## R287 extended live DTS/ALSA stability monitoring (2026-11-22)
+
+Read-only script [tools/monitor-webos26-dts-output-r287.sh](../tools/monitor-webos26-dts-output-r287.sh), commit `bd514100379d24e24b75059b1043cf9b4d465604`, SHA256 `245da729a3e1d5db723803cbc6de342415934448d744201b1d2157648414afea`; VPS `sh -n` PASS and no service mutation/recording, target download SHA256 PASS, executed using existing VPS→AlekS Core→TORMOZ→LG route.
+
+6 samples at 2026-11-21 22:27:58, 22:28:11, 22:28:25, 22:28:37, 22:28:50, 22:29:03 UTC, observed window **65 s**. Note script uses 10-s sleeps between queries but actual sample times are ~12–14 s due to collection overhead.
+
+| Signal | Sample 1 | Sample 6 | Result |
+| --- | --- | --- | --- |
+| Starfish PID | 20727 | 20727 | No PID change (0/5 intervals) |
+| AlekS DTS modules mapped | 3/3 | 3/3 | 3/3 in 6/6 samples |
+| Starfish RSS | 118024 KiB | 118032 KiB | +8 KiB across window |
+| Starfish threads | 72 | 72 | No change |
+| Starfish CPU ticks | 97124 | 101650 | +4526; thread-level attribution not yet captured |
+| uMS/audiooutputd | active/active | active/active | 6/6 |
+| LG audio reported codec | dts | dts | 6/6 |
+| ALSA PCM6 playback state | RUNNING | RUNNING | 6/6 |
+| ALSA hardware pointer | 66776320 | 69897472 | **+3121152 frames**; 5/5 positive intervals |
+
+ALSA hardware pointer average advancement ≈ **48.0k frames/s** over the elapsed 65 seconds, compatible with the previously measured stereo S16_LE 48-kHz ALSA sink. This does NOT prove nonzero samples, synchronization with video, absence of underruns, or successful audio output after a full TV power cycle. Source DTS decode, the ALSA sink and LG audio service are active *contemporaneously*, while audible sound was owner-confirmed previously.
+
+**Verdict:** PASSED bounded 65-second process/service/plugin/ALSA-continuity checks, no short-window memory growth beyond 8 KiB, no service restart. Initial silent first-open remains unexplained; do not claim root-cause fix, apply rank changes or publish universal webOS26 compatibility.
