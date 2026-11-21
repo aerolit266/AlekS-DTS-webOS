@@ -25,6 +25,14 @@ sh /tmp/aleks-dts-compat.sh
 
 **Кухонный LG 43NANO85A6A — состояние после перезагрузки (22.11.2026):** установщик, SHA256 и фактические переменные `umediaserver` PASS; `RESULT=CONFIG_AND_PROCESS_ENV_PASS; NATIVE_AUDIO_NOT_YET_TESTED`. Поддержка DTS 5.1 в штатном плеере с прослушиванием **ещё не подтверждена**, поэтому общественный релиз для webOS 26 преждевременен.
 
+## Проверка DTS через Lampa на LG
+
+Наш каталог приложений для Homebrew Channel: `https://gamefree24.ru/webos/repository.json`. На 22.11.2026 он отдаёт валидный JSON `packages`, содержит `lampa.tv` 2.3.0 и `mybylampa.tv` (lampa+) 2.3.0. Контрольный IPK lampa+ с внешнего источника соответствует SHA256 `0f6014790e6cb610cb1e53314b4f608483bcf8472589314ce86914c9126bb20c`.
+
+Для webOS shell подготовлен [скрипт открытия штатного окна добавления репозитория](tools/open-aleks-repo-homebrew-channel.sh). Он запускает `org.webosbrew.hbchannel` через Luna `applicationManager/launch` с `launchMode=addRepository`. Пользователь должен нажать **Add repository** на экране и обновить каталог. Скрипт **не изменяет** настройки DTS и не устанавливает IPK.
+
+Важно: тест DTS в Lampa не заменяет отдельного теста в штатном плеере LG. Доступность каталога и работа IPK зависят от сети телевизора и внешнего источника пакета.
+
 ## Порядок установки
 
 1. Определить профиль и проверить загрузку всех компонентов; не отключать ABI-защиту.
