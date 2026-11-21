@@ -30,7 +30,7 @@ DTS Core 2.0 and 5.1 also passed isolated tests. DTS-HD MA, DTS:X, DTS passthrou
 | LG 65NANO896PC · 03.60.96 · webOS TV 6.6.0 · ARMv7 · GStreamer 1.16.2 | DTS Core 5.1 verified on real hardware |
 | LG UP75006LF · ARMv7 · R278 | **Installation and DTS playback confirmed by owner:** `R278 configured`, isolated DTS 2.0 / DTS 5.1 / AC3 tests PASS, and owner reports everything working after installation. Separate Live TV regression results and persistence across multiple reboots are not documented |
 | Other LG ARMv7 TVs with native umediaserver / GStreamer | No model or firmware lock. The installer runs isolated DTS 2.0, DTS 5.1 and AC3 tests before enabling. Native-player playback still needs device-specific verification |
-| LG 43NANO85A6A · webOS 26 · 32-bit ARM media userland on ARM64 kernel · GStreamer 1.24.10 | **Isolated DTS 2.0/5.1 and software AC3 PASS**; native-player playback and installation remain untested. The original R278 installer must not be used; a dedicated frontend is required |
+| LG 43NANO85A6A · webOS 26 · 32-bit ARM media userland on ARM64 kernel · GStreamer 1.24.10 | **Isolated DTS 2.0/5.1 and software AC3 PASS**; native-player playback remains untested; candidate installation and immediate rollback both passed, without reboot. The original R278 installer must not be used; a dedicated frontend is required |
 | 64-bit native media process / different CPU ABI | Requires a build matching the actual native media process ABI |
 | Different media pipeline/ABI, or modified media configuration | Installer must refuse before changing media-service configuration |
 
@@ -44,7 +44,7 @@ Test a DTS Core file in the native player first; your TV may already support it.
 
 No `dtsdec`/`avdec_dca` element, matching DTS mounts or DTS Restore files in the tested standard locations were found. This does not prove that a nonstandard DTS Restore or built-in decoder is absent. No media-service or configuration changes were made on the TV; diagnosis used temporary files only.
 
-**Field tests, 2026-11-22:** ELF32 ARM, GStreamer 1.24.10 and archive/fixture SHA256 checks passed; `aleksdtsr130optin` and `aleksdts16dec` loaded; **DTS 2.0 and DTS 5.1 PASS**. Native `GstOMXAC3Dec` produced PCM S16LE/48 kHz and `Got EOS` both with and without AlekS DTS plugins, but the process stalled during teardown and was terminated by timeout (exit 143). This is **not evidence of failed AC3 decoding**. Clean-shutdown AC3 and native-player integration remain unverified. **Nothing was installed.**
+**Field tests, 2026-11-22:** ELF32 ARM, GStreamer 1.24.10 and archive/fixture SHA256 checks passed; `aleksdtsr130optin` and `aleksdts16dec` loaded; **DTS 2.0 and DTS 5.1 PASS**. Native `GstOMXAC3Dec` produced PCM S16LE/48 kHz and `Got EOS` both with and without AlekS DTS plugins, but the process stalled during teardown and was terminated by timeout (exit 143). This is **not evidence of failed AC3 decoding**. Clean-shutdown AC3 and native-player integration remain unverified. **Update:** later on the same day, installation and immediate rollback both completed successfully; native-player DTS was not tested.
 
 **Do not install R278:** the installer checks `uname -m = armv7l` and rejects the 64-bit kernel. DTS plugins passed isolated checks on GStreamer 1.24.10, but clean-shutdown AC3, `umediaserver` integration, rollback and native-player playback have not been verified. Do not bypass this guard. Backups and further verification are required before changes.
 
@@ -111,13 +111,13 @@ Expected immediately after rollback when the original `umediaserver.env` did not
 
 For **LG 43NANO85A6A, firmware 43.22.74**, a dedicated frontend adapts the SHA256-pinned R278 archive. It verifies actual media ELF32 ARM, GStreamer 1.24.10, BusyBox timeout compatibility, DTS Core stereo/5.1, software AC3 and current `umediaserver` configuration. Original R278 environment-backup and rollback logic is retained.
 
-**Run `verify` mode only at this stage.** The script uses a temporary `/tmp` directory without changing the native media service.
+**Use `verify` only on unknown models and during initial checks.** The script uses a temporary `/tmp` directory without changing the native media service.
 
 ```powershell
 ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/cb18937bee85c422f81bc31e4aab15d9d1fda8db/tools/install-webos26-preview.sh -o /tmp/aleks-dts-webos26-preview.sh && echo '7883bdb5195ce5af13837cb65b9c9a79e6224f7d830a0cb4aa9dccf456789ae0  /tmp/aleks-dts-webos26-preview.sh' | sha256sum -c - && sh /tmp/aleks-dts-webos26-preview.sh verify"
 ```
 
-Success: `RESULT=VERIFIED_ISOLATED_NO_INSTALL`. **Kitchen LG 43NANO85A6A field verification PASS (2026-11-22):** `PATCH_PASS`, SHA256 of all four plugins and three fixtures, `PASS dts-stereo`, `PASS dts-51`, `PASS ac3-software-augmented`, `RESULT=VERIFIED_ISOLATED_NO_INSTALL`. Actual `install` and rollback have not been tested on the kitchen TV. **PREVIEW release with eMMC guard:** commit `cb18937`, SHA256 `7883bdb5...`. VPS `patch-check` passed; an earlier PREVIEW `verify` passed on the kitchen LG. Activation-path eMMC guard has not been run on the kitchen TV. **Changing `umediaserver.env` requires explicit approval.** Rollback, `/var` persistence after reboot and explicit owner authorization to modify `umediaserver.env` remain required. Do not use the old `install-universal.sh` on this TV.
+Success: `RESULT=VERIFIED_ISOLATED_NO_INSTALL`. **Kitchen LG 43NANO85A6A field verification PASS (2026-11-22):** `PATCH_PASS`, SHA256 of all four plugins and three fixtures, `PASS dts-stereo`, `PASS dts-51`, `PASS ac3-software-augmented`, `RESULT=VERIFIED_ISOLATED_NO_INSTALL`. The candidate `install` and immediate `rollback` later passed on the kitchen TV without reboot or native-player validation. **PREVIEW release with eMMC guard:** commit `cb18937`, SHA256 `7883bdb5...`. VPS `patch-check` passed; an earlier PREVIEW `verify` passed on the kitchen LG. Activation-path eMMC guard has not been run on the kitchen TV. **Changing `umediaserver.env` requires explicit approval.** Rollback, `/var` persistence after reboot and explicit owner authorization to modify `umediaserver.env` remain required. Do not use the old `install-universal.sh` on this TV.
 
 ## Installation
 
