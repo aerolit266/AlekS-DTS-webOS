@@ -26,7 +26,7 @@ if command -v pactl >/dev/null 2>&1 && command -v timeout >/dev/null 2>&1; then
   rc=$?
   if [ "$rc" -eq 0 ]; then
     printf '%s\n' "$tmp" | awk '
-      /^Sink Input #[0-9]+/ { print "INPUT_ID=" $3 }
+      /^Sink Input #[0-9]+/ { x=$3; sub(/^#/,"",x); print "INPUT_ID=" x }
       /^[ \t]*Sink:/ {print "INPUT_SINK=" $2}
       /^[ \t]*Sample Specification:/ {sub(/^[ \t]*Sample Specification: /,""); print "INPUT_SAMPLE_SPEC=" $0}
       /^[ \t]*Corked:/ {print "INPUT_CORKED=" $2}
@@ -51,7 +51,7 @@ if command -v pactl >/dev/null 2>&1 && command -v timeout >/dev/null 2>&1; then
   fi
   echo '=== PULSE DEFAULT OUTPUT ==='
   timeout 7 pactl -s "$pulse" list short sinks 2>/dev/null |
-    awk '$2=="pcm_output" {print "PCM_OUTPUT_SINK_ID=" $1 " DRIVER=" $3 " FORMAT=" $4 " STATE=" $5}' |
+    awk '$2=="pcm_output" {print "PCM_OUTPUT_SINK_ID=" $1 " DRIVER=" $3 " FORMAT=" $4 " " $5 " " $6 " STATE=" $7}' |
     head -n 2 || :
   timeout 7 pactl -s "$pulse" list short sink-inputs 2>/dev/null |
     awk 'END {print "SINK_INPUT_COUNT=" NR}' || :
