@@ -193,6 +193,17 @@ fi
 # INSTALL: only after explicit model-named opt-in. Keep the Homebrew + original
 # installer backup/rollback logic; no /usr changes and no restart in this script.
 [ "$action" = install ] || fail 'Unexpected action'
+# Kitchen webOS 26 uses two /var mount layers: read-only overlay under a
+# writable ext4 bind mount from eMMC /dev/mmcblk0p59. Check the *effective*
+# mount, not df(1)'s reported filesystem or the lower overlay layer.
+# This guard does not prove persistence across firmware maintenance/reboots.
+[ -r /proc/self/mountinfo ] || fail 'Cannot inspect effective /var mount'
+var_mount=$(awk '$5 == "/var" { line=$0 } END { print line }' /proc/self/mountinfo)
+case "$var_mount" in
+  *" - ext4 /dev/mmcblk0p59 rw,"*) ;;
+  *) fail 'Effective /var is not the expected writable eMMC ext4 mount; refuse activation' ;;
+esac
+printf 'PASS: /var effective mount is writable ext4 on /dev/mmcblk0p59\n'
 [ ! -e "$root" ] && [ ! -L "$root" ] ||
     fail "Existing installation directory: $root"
 [ ! -e "$envfile" ] && [ ! -L "$envfile" ] ||
