@@ -22,6 +22,7 @@ DTS Core 2.0 and 5.1 also passed isolated tests. DTS-HD MA, DTS:X, DTS passthrou
 | Device or platform | Status |
 | --- | --- |
 | LG 65NANO896PC · 03.60.96 · webOS TV 6.6.0 · ARMv7 · GStreamer 1.16.2 | DTS Core 5.1 verified on real hardware |
+| LG UP75006LF · ARMv7 · R278 | **Installer completed:** user reported `R278 configured`; isolated DTS 2.0, DTS 5.1, and AC3 tests passed. Native-player audio and persistence after reboot are not yet verified |
 | Other LG ARMv7 TVs with native umediaserver / GStreamer | No model or firmware lock. The installer runs isolated DTS 2.0, DTS 5.1 and AC3 tests before enabling. Native-player playback still needs device-specific verification |
 | LG ARM64 or other architectures | Not supported by existing R278 binary plugins; requires a separate build |
 | Different media pipeline/ABI, or modified media configuration | Installer must refuse before changing media-service configuration |
