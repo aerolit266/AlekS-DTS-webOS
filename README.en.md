@@ -37,7 +37,7 @@ Test a DTS Core file in the native player first; your TV may already support it.
 
 No `dtsdec`/`avdec_dca` element, matching DTS mounts or DTS Restore files in the tested standard locations were found. This does not prove that a nonstandard DTS Restore or built-in decoder is absent. No TV modifications were made.
 
-**Field test, 2026-11-22:** isolated R278 verifier passed ELF32 ARM checks (`umediaserver`, `gst-inspect`, GStreamer), GStreamer 1.24.10 and SHA256 checks for the archive, all four plugins and all three fixtures. **BLOCKED:** the first `gst-inspect` failed to load `aleksdtsr130optin` (exit 1). DTS/AC3 decoding and native-player playback were **not tested**; **no install** was performed. Capture GStreamer stderr to find the actual loader issue rather than bypassing the guard.
+**Field test, 2026-11-22:** ELF32 ARM checks (`umediaserver`, `gst-inspect`, GStreamer), GStreamer 1.24.10 and SHA256 checks for the archive, all four plugins and all three fixtures passed. The original test failed **before loading any plugin** because BusyBox 1.36.1 rejected the unsupported `timeout -t 20` option. **Fixed:** portable `timeout 20`; rerun on physical TV required. DTS/AC3 decoding and native-player playback remain **untested**; **no install** performed.
 
 **Do not install R278:** its installer checks `uname -m = armv7l` and rejects a 64-bit kernel, while R278 plugin compatibility with GStreamer 1.24.10 is unverified. Do not disable gates. Backups, isolated tests, native-player and rollback validation are required before replacing any existing DTS solution.
 
@@ -59,7 +59,7 @@ The LG 43NANO85A6A can run an **isolated** compatibility test of all four existi
 From TORMOZ PowerShell, using the already configured webOS SDK profile:
 
 ```powershell
-ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/main/tools/verify-r278-webos26.sh -o /tmp/aleks-dts-verify.sh && echo '279f8f566d16fb4eab70bb9bd3738650ec986e47aeacd55dca2eb9c26c05f193  /tmp/aleks-dts-verify.sh' | sha256sum -c - && sh /tmp/aleks-dts-verify.sh"
+ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/main/tools/verify-r278-webos26.sh -o /tmp/aleks-dts-verify.sh && echo '6e8dd4f813ca154b31ba96d8113b2c64a34e089dbdca11772858d6e5a7613f81  /tmp/aleks-dts-verify.sh' | sha256sum -c - && sh /tmp/aleks-dts-verify.sh"
 ```
 
 A `PASS ISOLATED R278 ON GSTREAMER 1.24 (NO INSTALL)` result demonstrates only separate-process fixture compatibility, **not** native-player functionality. Failures stop without enabling plugins and include a short diagnostic log excerpt.
