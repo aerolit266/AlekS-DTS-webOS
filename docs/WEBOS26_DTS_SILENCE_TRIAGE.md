@@ -201,3 +201,24 @@ Read-only script [tools/monitor-webos26-dts-output-r287.sh](../tools/monitor-web
 ALSA hardware pointer average advancement ≈ **48.0k frames/s** over the elapsed 65 seconds, compatible with the previously measured stereo S16_LE 48-kHz ALSA sink. This does NOT prove nonzero samples, synchronization with video, absence of underruns, or successful audio output after a full TV power cycle. Source DTS decode, the ALSA sink and LG audio service are active *contemporaneously*, while audible sound was owner-confirmed previously.
 
 **Verdict:** PASSED bounded 65-second process/service/plugin/ALSA-continuity checks, no short-window memory growth beyond 8 KiB, no service restart. Initial silent first-open remains unexplained; do not claim root-cause fix, apply rank changes or publish universal webOS26 compatibility.
+
+## R288 passive per-thread CPU baseline under working DTS (2026-11-22)
+
+Script: [tools/profile-webos26-dts-cpu-r288.sh](../tools/profile-webos26-dts-cpu-r288.sh), final commit `756c3c7ee64a2be3d705959256b47b64995aecbb`, SHA256 `b230a2759b0540390d87704e220c8bdb1bf93162a171418a600a43a68ef41a58`. VPS `sh -n` and synthetic AWK two-snapshot deltas PASS; exact file hash verified on kitchen TV; executed using existing AlekS Core, no service or playback changes.
+
+Two earlier diagnostic executions were **invalid** and are **not** TV CPU results: the first mixed numeric sort and `join`'s lexicographic requirement; the second discovered **GNU `join` is missing** on LG's busybox shell. The script was corrected to a plain POSIX AWK associative-array merge and enforces nonempty thread intersection. Do not interpret those earlier `TOTAL_TICKS=0` values as zero load.
+
+**Valid 10-second result:** Starfish PID20727, 72 threads stable, `CLK_TCK=100`, total **963 CPU ticks** aggregated across all media-process threads (roughly **0.96 logical CPU core** over ~10s, not DTS-specific).
+
+| TID | Thread name (truncated kernel comm) | Δ CPU ticks, 10s |
+| --- | --- | ---: |
+| 20735 | souphttpsrc0sr | 258 |
+| 20753 | multiqueueind | 153 |
+| 20793 | aqueuesrc | 65 |
+| 20733 | souphttpsrc | 64 |
+| 20805 | OMX_VideoInput | 47 |
+| 20840 | aqueuesrc | 40 |
+| 20806 | OMX_VideoOutput | 30 |
+| 20767, 20768, 20769 | multiqueueind | 19, 19, 18 |
+
+**Interpretation:** currently the largest *individual* measured CPU consumers are HTTP source and queue threads, with some OMX video threads. This suggests measuring media source/buffering before attributing playback CPU consumption to DTS decoder. These are thread labels, not definitive code-stack hotspots; no independent pure-DTS decoding cost or AC3 control measurement was performed. This is a working-session baseline only. No production optimization, rank change or LG audio configuration change applied.
