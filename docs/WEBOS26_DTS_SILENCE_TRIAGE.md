@@ -85,3 +85,18 @@ Created [`tools/test-webos26-decodebin3-pcm-r282.sh`](../tools/test-webos26-deco
 Decision points: if `decodebin3` differs by rank then investigate resource handling; if all decodebin3 tests work, rank changes are lower priority, investigate real player stream caps and hardware/native sound sink. Successful S32LE/stereo negotiation with `fakesink` is **not proof** that the physical sink accepts or reproduces it.
 
 **Safety:** no replacement or mutation of stock `libgstmatroska.so`, `libgsttsinkbin.so`, `/etc/gst/gstcool.conf`, `umediaserver.env` or LG system partitions; no reboot or service restart. DTS playback still **FAIL** until real audio test passes.
+
+## R282 field result: decodebin3 and S32LE conversion (2026-11-22)
+
+Owner executed `tools/test-webos26-decodebin3-pcm-r282.sh` on LG 43NANO85A6A. R278 installed SHA256 and fixture PASS, `decodebin`, `decodebin3`, `audioconvert` available.
+
+| Case | Effective ranks (AlekS/decproxy) | Custom DTS bin instantiated | EOS | Sink PCM caps | Exit |
+| --- | --- | --- | --- | --- | --- |
+| db3_stock | 288 / 0 | yes | yes | 6 channels, S16LE | **143** |
+| db3_lg | 288 / 300 | yes | yes | 6 channels, S16LE | **143** |
+| db3_aleks | 350 / 300 | yes | yes | 6 channels, S16LE | **143** |
+| db3_aleks_pcm2 | 350 / 300 | yes | yes | 2 channels, S32LE | **143** |
+
+All four `decodebin3 ! fakesink` test cases reached EOS and reported no negotiation error, **but exited 143 after the 12-second timeout**. This is **not clean teardown**; it is potentially the known native OMX/decproxy shutdown stall. `exit 143` is `128 + SIGTERM(15)`; no evidence this signal arose *before* EOS. A clean-exit PASS must not be claimed. `tsinkbin` and `alsasink` factory available; ALSA advertises both S16LE and S32LE plus other formats, but these templates **do not describe the actual LG playback sink/resource path**.
+
+**Decision:** R281+R282 do not justify changing ranks: all isolated pipelines decode under rank 288/300. S32LE stereo conversion is technically feasible but real-audio efficacy remains untested. Prioritize actual uMS/Starfish audio resource acquisition, decoder instance, `audiooutputd` routing, playback track/caps and native sink; avoid production changes while diagnosis is incomplete.
