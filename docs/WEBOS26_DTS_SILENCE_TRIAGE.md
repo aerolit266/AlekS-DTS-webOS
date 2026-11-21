@@ -45,3 +45,27 @@ Before experimenting with `libgstmatroska.so`, `audiooutputd`, media service env
 
 Next non-invasive test: [`diagnose-webos26-dts-path-r280.sh`](../tools/diagnose-webos26-dts-path-r280.sh) (run **during playback**, read-only) prints per-library mappings for each `starfish-media-` process, GStreamer element ranks/caps and stock decoder policy clues. After determining whether `libgstaleksdts16dec.so` is actually loaded, distinguish **decoder selection** from **S16LE→S32LE/output routing** before changing any code. Native player and Lampa may take different paths.
 
+
+## R280 real playback decoder rank evidence (user field output, 2026-11-22)
+
+- `starfish-media-` PID 10846 maps **libgstaleksdts.so, libgstaleksdtsr130optin.so and libgstaleksdts16dec.so**, while `libgstaleksdtscaps.so` is **not mapped**. A second `starfish-media-` PID 10848 maps none. Mapping `libgstaleksdts16dec.so` proves its library loaded, **not that an element instance is in the active audio chain**.
+- Stock GStreamer libraries mapped in PID10846: `libgstaudioconvert.so`, `libgstaudioparsers.so`, `libgstaudioresample.so`, `libgstdecproxy.so`, `libgstfakedec.so`, `libgstomx.so`, `libgsttsinkbin.so`; stock modules' mere mapping does not prove they processed the DTS stream.
+- GStreamer factory ranks from isolated `gst-inspect`: `aleksdtsr130optin=322`, `aleksdts16dec=288`, `aleksdtscaps=256`; decoder offers `audio/x-dts → audio/x-raw S16LE [1..8 channels]`; parser accepts `audio/x-unknown, codec-id=A_DTS` and `audio/x-dts`.
+- `decproxy` reported **factory rank NONE (0)** in `gst-inspect`, but LG `/etc/gst/gstcool.conf` declares `decproxy=300`. These are **different rank sources** and may affect native pipeline selection; **effective runtime precedence remains unverified**.
+- No `adecswitch` or `audiosink` factory was discovered under those exact names. This alone does not prove there is no hardware sink or native output.
+- **Leading hypothesis**: after `aleksdtsr130optin` parses DTS (rank 322), stock LG `decproxy` (policy 300) is preferred over `aleksdts16dec` (288), causing a fake audio decoder / no PCM. Actual routing needs confirmation.
+- **Separate hypothesis**: PCM negotiating to native sink may fail. Important distinction: **S16LE is integer PCM**, so webOS25 documentation saying integer-only does *not* by itself establish that S16LE is unsupported. Test actual kitchen sink caps before proposing S32LE conversion.
+
+### R281 falsifiable isolated experiment
+
+Created [tools/test-webos26-decoder-ranks-r281.sh](../tools/test-webos26-decoder-ranks-r281.sh). It verifies bundled files SHA256, runs GStreamer only with a **temporary registry**, never modifies media service or stock libraries, and tests DTS 5.1 through `decodebin ! fakesink` (no speakers) under three per-process `GST_PLUGIN_FEATURE_RANK` policies:
+
+1. `decproxy:0,aleksdts16dec:288` (control).
+2. `decproxy:300,aleksdts16dec:288` (simulate stock policy).
+3. `decproxy:300,aleksdts16dec:350` (candidate rank repair).
+
+Logs report exit, `AlekSDts16DecBin` instantiation, EOS, and 6-channel PCM negotiation only. GStreamer 1.24 supports documented `GST_PLUGIN_FEATURE_RANK` overrides (since 1.18): https://gstreamer.freedesktop.org/documentation/gstreamer/running.html .
+
+**Decision gate:** only if (2) reproduces the failed decoder selection and (3) restores 6-channel PCM may a reversible native service environment override be considered. Still require a real audio sink / Lampa sound test and AC3/DVB regression; never infer production success from `fakesink`.
+
+**Status:** R281 script GitHub commit `def783e5`; VPS shell syntax PASS, SHA256 `b75fe27330827db37a17c143796313347e72a8f8aa37c582bef0255d551a84d2`; NOT YET TESTED ON KITCHEN.
