@@ -37,6 +37,8 @@ Test a DTS Core file in the native player first; your TV may already support it.
 
 No `dtsdec`/`avdec_dca` element, matching DTS mounts or DTS Restore files in the tested standard locations were found. This does not prove that a nonstandard DTS Restore or built-in decoder is absent. No TV modifications were made.
 
+**Field test, 2026-11-22:** isolated R278 verifier passed ELF32 ARM checks (`umediaserver`, `gst-inspect`, GStreamer), GStreamer 1.24.10 and SHA256 checks for the archive, all four plugins and all three fixtures. **BLOCKED:** the first `gst-inspect` failed to load `aleksdtsr130optin` (exit 1). DTS/AC3 decoding and native-player playback were **not tested**; **no install** was performed. Capture GStreamer stderr to find the actual loader issue rather than bypassing the guard.
+
 **Do not install R278:** its installer checks `uname -m = armv7l` and rejects a 64-bit kernel, while R278 plugin compatibility with GStreamer 1.24.10 is unverified. Do not disable gates. Backups, isolated tests, native-player and rollback validation are required before replacing any existing DTS solution.
 
 A read-only preflight is available. It changes no files, services or mounts:
