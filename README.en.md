@@ -66,6 +66,18 @@ ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubuse
 
 A `PASS ISOLATED R278 ON GSTREAMER 1.24 (NO INSTALL)` result demonstrates only separate-process fixture compatibility, **not** native-player functionality. Failures stop without enabling plugins and include a short diagnostic log excerpt.
 
+### AC3 diagnostics on webOS 26
+
+**Hardware test, 2026-11-22:** R278 on LG 43NANO85A6A, GStreamer 1.24.10: both `aleksdtsr130optin` and `aleksdts16dec` loaded; **DTS 2.0 PASS, DTS 5.1 PASS, AC3 5.1 FAIL** with a `decodebin` pipeline. The incomplete log cannot yet distinguish a missing AC3 decoder, different passthrough handling, or plugin interaction. Do not install R278 into the native media pipeline until the AC3 regression is understood.
+
+**Isolated AC3 differential diagnostic**, no service restart or system modification:
+
+```powershell
+ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/9571cd836835d0ca7693872151917121385bdba4/tools/diagnose-ac3-webos26.sh -o /tmp/aleks-dts-ac3diag.sh && echo 'f398061843af079f62f36d8fe8594fd5c4d521df02caa18020c26e5864572cd7  /tmp/aleks-dts-ac3diag.sh' | sha256sum -c - && sh /tmp/aleks-dts-ac3diag.sh"
+```
+
+The output marks `PASS_AC3` and `FAIL_AC3` for `native` and `augmented` modes. Exit status 0 means **diagnostic completed**, not necessarily AC3 passed. Temporary files are removed automatically.
+
 ## Installation
 
 Open root SSH on an LG ARMv7 TV and paste the full block. It downloads the pinned R278 archive with SHA-256 validation, replaces **only the fixed model/firmware and system-binary hash gate** in a temporary installer copy, and retains plugin integrity verification, media-pipeline tests, and rollback.
