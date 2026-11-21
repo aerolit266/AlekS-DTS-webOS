@@ -63,7 +63,7 @@ run_gst() {
     GST_PLUGIN_PATH_1_0="$base:$work/plugins" \
     GST_PLUGIN_SYSTEM_PATH_1_0="$base" \
     ALEKS_DTS_R130_ALLOW_AUTOPLUG=YES \
-    timeout -t 20 "$@"
+    timeout 20 "$@"
 }
 inspect() {
   name=$1
