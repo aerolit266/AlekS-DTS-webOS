@@ -43,10 +43,12 @@ DTS Core 2.0 и 5.1 также прошли изолированные тест�
   curl -fLsS --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 60 \
     -o "$stage/install-universal.sh" \
     'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/main/install-universal.sh'
-  printf '%s  %s\n' 'c499c9266d175301b48574dbef604b59b40b8d4ba529808fcac6bb1ea4bdbab2' "$stage/install-universal.sh" | sha256sum -c -
+  printf '%s  %s\n' 'fa674ae01a879f96c10652592c3da987640c34efa2b50a0119133acb7f3ffb3f' "$stage/install-universal.sh" | sha256sum -c -
   sh "$stage/install-universal.sh" install
 )
 ```
+
+**Совместимость каталога конфигурации:** при установке путь к `umediaserver.env` определяется по реально объявленному `EnvironmentFiles` службы `umediaserver.service`. Если каталог ещё отсутствует, он создаётся только при существующем корневом родительском каталоге и подтверждённом пути в конфигурации службы. Если служба использует другой механизм запуска, установка остановится без догадок. Для диагностики: `sh /tmp/aleks-dts-universal.sh diagnose` (предварительно скачайте скрипт под этим именем).
 
 **Проверка без установки:** в последней строке замените `install` на `verify`. Проверка выполняет изолированные тесты декодирования, но не меняет конфигурацию медиасервиса. Для другой модели рекомендуется сначала `verify`.
 
