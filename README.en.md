@@ -37,9 +37,9 @@ Test a DTS Core file in the native player first; your TV may already support it.
 
 No `dtsdec`/`avdec_dca` element, matching DTS mounts or DTS Restore files in the tested standard locations were found. This does not prove that a nonstandard DTS Restore or built-in decoder is absent. No TV modifications were made.
 
-**Field test, 2026-11-22:** ELF32 ARM checks (`umediaserver`, `gst-inspect`, GStreamer), GStreamer 1.24.10 and SHA256 checks for the archive, all four plugins and all three fixtures passed. The original test failed **before loading any plugin** because BusyBox 1.36.1 rejected the unsupported `timeout -t 20` option. **Fixed:** portable `timeout 20`; rerun on physical TV required. DTS/AC3 decoding and native-player playback remain **untested**; **no install** performed.
+**Field tests, 2026-11-22:** ELF32 ARM, GStreamer 1.24.10 and archive/fixture SHA256 checks passed; `aleksdtsr130optin` and `aleksdts16dec` loaded; **DTS 2.0 and DTS 5.1 PASS**. Native `GstOMXAC3Dec` produced PCM S16LE/48 kHz and `Got EOS` both with and without AlekS DTS plugins, but the process stalled during teardown and was terminated by timeout (exit 143). This is **not evidence of failed AC3 decoding**. Clean-shutdown AC3 and native-player integration remain unverified. **Nothing was installed.**
 
-**Do not install R278:** its installer checks `uname -m = armv7l` and rejects a 64-bit kernel, while R278 plugin compatibility with GStreamer 1.24.10 is unverified. Do not disable gates. Backups, isolated tests, native-player and rollback validation are required before replacing any existing DTS solution.
+**Do not install R278:** the installer checks `uname -m = armv7l` and rejects the 64-bit kernel. DTS plugins passed isolated checks on GStreamer 1.24.10, but clean-shutdown AC3, `umediaserver` integration, rollback and native-player playback have not been verified. Do not bypass this guard. Backups and further verification are required before changes.
 
 A read-only preflight is available. It changes no files, services or mounts:
 
@@ -66,17 +66,17 @@ ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubuse
 
 A `PASS ISOLATED R278 ON GSTREAMER 1.24 (NO INSTALL)` result demonstrates only separate-process fixture compatibility, **not** native-player functionality. Failures stop without enabling plugins and include a short diagnostic log excerpt.
 
-### AC3 diagnostics on webOS 26
+### AC3 on webOS 26: hardware decoder vs explicit software path
 
-**Hardware test, 2026-11-22:** R278 on LG 43NANO85A6A, GStreamer 1.24.10: both `aleksdtsr130optin` and `aleksdts16dec` loaded; **DTS 2.0 PASS, DTS 5.1 PASS, AC3 5.1 FAIL** with a `decodebin` pipeline. The incomplete log cannot yet distinguish a missing AC3 decoder, different passthrough handling, or plugin interaction. Do not install R278 into the native media pipeline until the AC3 regression is understood.
+**Confirmed from device logs:** both `native` and `augmented` autoplugged `GstOMXAC3Dec`, produced PCM S16LE/48 kHz (negotiated channels changed 6 → 8), and reached `Got EOS` after about 0.2 s. The process then stalled in teardown and was terminated by the 20 s timeout (`exit=143`). The previous `FAIL_BOTH` label was a **false inference about AC3 decoding**. The `invalid property id 20 for downmix` warning and OMX teardown delay deserve separate diagnosis; no evidence connects them specifically to AlekS DTS.
 
-**Isolated AC3 differential diagnostic**, no service restart or system modification:
+New **R2 isolated verification** explicitly uses the TV's discovered software `avdec_ac3`, running AC3 with and without AlekS DTS plugins. It requires EOS, PCM/48 kHz, clean exit, and no DTS decoder selected for AC3. DTS stereo/5.1 and SHA256 checks remain. It never alters `umediaserver`, mounts, services or persistent configuration.
 
 ```powershell
-ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/9571cd836835d0ca7693872151917121385bdba4/tools/diagnose-ac3-webos26.sh -o /tmp/aleks-dts-ac3diag.sh && echo 'f398061843af079f62f36d8fe8594fd5c4d521df02caa18020c26e5864572cd7  /tmp/aleks-dts-ac3diag.sh' | sha256sum -c - && sh /tmp/aleks-dts-ac3diag.sh"
+ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/d050fb7294b4414bc36fe861779eaa1497876ac4/tools/verify-r278-webos26-r2.sh -o /tmp/aleks-dts-r2.sh && echo '1ecd5fbd8698c9c2d15612c6460e325d0c6621041fb1a836c1e1dac8c1b10ea3  /tmp/aleks-dts-r2.sh' | sha256sum -c - && sh /tmp/aleks-dts-r2.sh"
 ```
 
-The output marks `PASS_AC3` and `FAIL_AC3` for `native` and `augmented` modes. Exit status 0 means **diagnostic completed**, not necessarily AC3 passed. Temporary files are removed automatically.
+Success: `RESULT=PASS_DTS_AND_AC3_SOFTWARE_ISOLATED; NO_INSTALL`. On failure: `RESULT=AC3_REGRESSION_NOT_CLEARED; NO_INSTALL`. Neither result alone authorizes native media installation; hardware OMX and native player require separate verification.
 
 ## Installation
 
