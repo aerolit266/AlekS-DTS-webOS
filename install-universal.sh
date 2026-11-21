@@ -43,8 +43,11 @@ done
 stage=$(mktemp -d /tmp/aleks-dts-universal.XXXXXX) || fail 'Cannot create temporary directory.'
 cleanup() {
     rm -rf -- "$stage"
-    if [ -n "${created_env_dir:-}" ] && [ ! -e "${config_path:-}" ]; then
-        rmdir "$created_env_dir" 2>/dev/null || :
+    if [ -n "${created_env_dirs:-}" ] && [ ! -e "${config_path:-}" ]; then
+        # Reverse creation order. Never force-remove a nonempty directory.
+        for d in $created_env_dirs; do
+            rmdir "$d" 2>/dev/null || :
+        done
     fi
 }
 trap cleanup EXIT
@@ -63,7 +66,7 @@ grep -Fq 'hash 46a353723ec66894596d9ce0822c3f2273422731ad0426fc6ff16beb349162bc 
 # Derive the native service's declared environment path rather than assuming
 # a folder borrowed from one TV model. No service modification or new drop-in.
 config_path=''
-created_env_dir=''
+created_env_dirs=''
 if [ "$action" = install ]; then
     command -v systemctl >/dev/null 2>&1 || fail 'systemctl is missing.'
     env_line=$(systemctl show umediaserver.service -p EnvironmentFiles) ||
@@ -93,21 +96,30 @@ if [ "$action" = install ]; then
     [ -n "$config_path" ] ||
         fail 'umediaserver.service does not declare an umediaserver.env file. Run diagnose; a different integration method is required.'
     dir=${config_path%/*}
-    if [ ! -d "$dir" ]; then
-        [ ! -e "$dir" ] && [ ! -L "$dir" ] ||
-            fail 'Environment directory is not a regular directory.'
-        parent=${dir%/*}
-        [ -d "$parent" ] && [ ! -L "$parent" ] ||
-            fail 'Environment directory parent is absent or is a symlink. Run diagnose.'
-        [ "$(stat -c %u "$parent")" = 0 ] ||
-            fail 'Environment directory parent must be owned by root.'
-        mkdir -m 0755 "$dir" ||
-            fail 'Could not create the service-declared environment directory.'
-        created_env_dir=$dir
-        printf 'Created service-declared environment directory: %s\n' "$dir"
+    # The exact chain below is referenced by umediaserver.service on LG webOS.
+    # /var is writable; never create arbitrary directories under /etc or /usr.
+    if [ "$dir" = /var/systemd/system/env ]; then
+        for d in /var /var/systemd /var/systemd/system /var/systemd/system/env; do
+            [ ! -L "$d" ] || fail "Symbolic link in media configuration path: $d"
+            if [ -d "$d" ]; then
+                [ "$(stat -c %u "$d")" = 0 ] || fail "Non-root directory owner: $d"
+            elif [ -e "$d" ]; then
+                fail "Not a directory in media configuration path: $d"
+            else
+                [ "$d" != /var ] || fail 'Root /var directory is missing.'
+                mkdir -m 0755 "$d" || fail "Cannot create media config directory: $d"
+                created_env_dirs="$d $created_env_dirs"
+                printf 'Created media environment directory: %s\n' "$d"
+                [ "$(stat -c %u "$d")" = 0 ] || fail "Incorrect owner for created directory: $d"
+            fi
+        done
+    else
+        # No automatic creation for unknown service paths.
+        [ -d "$dir" ] && [ ! -L "$dir" ] ||
+            fail 'Unknown media configuration directory. Run diagnose.'
+        [ "$(stat -c %u "$dir")" = 0 ] ||
+            fail 'Environment directory must be owned by root.'
     fi
-    [ ! -L "$dir" ] && [ "$(stat -c %u "$dir")" = 0 ] ||
-        fail 'Environment directory must be a root-owned real directory.'
     if [ -e "$config_path" ] || [ -L "$config_path" ]; then
         [ -f "$config_path" ] && [ ! -L "$config_path" ] ||
             fail 'Unsafe pre-existing media environment file.'
