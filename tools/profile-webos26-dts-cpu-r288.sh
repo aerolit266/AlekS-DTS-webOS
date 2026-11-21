@@ -37,8 +37,7 @@ fi
 snap > "$tmp/after"
 after_count=$(wc -l < "$tmp/after")
 printf 'THREADS_BEFORE=%s THREADS_AFTER=%s\n' "$before_count" "$after_count"
-join "$tmp/before" "$tmp/after" |
- awk '{d=$3-$2; if(d>=0) {printf "%s %.0f\n",$1,d;sum+=d;count++}} END {printf "TOTAL_TICKS %.0f\n",sum}' > "$tmp/diff"
+awk 'NR==FNR {before[$1]=$2; next} ($1 in before) {d=$2-before[$1]; if(d>=0) {printf "%s %.0f\n",$1,d;sum+=d;count++}} END {printf "TOTAL_TICKS %.0f\n",sum}' "$tmp/before" "$tmp/after" > "$tmp/diff"
 printf 'CLK_TCK=%s\n' "$(getconf CLK_TCK 2>/dev/null || echo UNKNOWN)"
 grep '^TOTAL_TICKS ' "$tmp/diff" || :
 if ! grep -q '^[0-9][0-9]* ' "$tmp/diff"; then
