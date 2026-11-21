@@ -222,3 +222,23 @@ Two earlier diagnostic executions were **invalid** and are **not** TV CPU result
 | 20767, 20768, 20769 | multiqueueind | 19, 19, 18 |
 
 **Interpretation:** currently the largest *individual* measured CPU consumers are HTTP source and queue threads, with some OMX video threads. This suggests measuring media source/buffering before attributing playback CPU consumption to DTS decoder. These are thread labels, not definitive code-stack hotspots; no independent pure-DTS decoding cost or AC3 control measurement was performed. This is a working-session baseline only. No production optimization, rank change or LG audio configuration change applied.
+
+## R289–R291: working-session DTS vs audio output/mute and ARC/eARC — 2026-11-22
+
+All commands were executed **on the kitchen LG** through the existing GameFree24 VPS MCP V3 → AlekS Core → TORMOZ SDK route, root read-only, no film interruption. Each shell script was SHA256 verified on TV and syntax checked on VPS.
+
+| Probe | Source SHA256 | Evidence |
+| --- | --- | --- |
+| [R289](../tools/check-webos26-dts-first-start-r289.sh), commit `85823d0` | `ff5f09877bd08318fbb7cfd3d5d5c9d64ee504cc77fb3cb63368a1956a1be941` | New working-session reference fingerprint |
+| [R290](../tools/check-webos26-audio-mute-route-r290.sh), commit `a764ecb` | `b39132e9a5e9353a14009ba12ff6937b53dc08a07da8c953cd8f91bcd82e568b` | Read-only LS2 output selection, volume, mute and internal source/sink |
+| [R291](../tools/check-webos26-earc-route-r291.sh), commit `6489ba5` | `5780fb753e138291597b12aa30ab9d57ffd3035d9df0ecc71830271b1a7fdd07` | ARC state and ALSA eARC mixer read-only |
+
+**R289 working-session fingerprint:** UTC 2026-11-21 22:37:05, `umediaserver` and `audiooutputd` active, Starfish PID20727 mapped three AlekS DTS plugins; `libgstaleksdtscaps.so` not mapped, which is not by itself a problem; 72 threads, RSS124684 KiB. ALSA card0 pcm6p RUNNING via `alsa-sink-MARS`, output S16_LE 2ch 48000 Hz, `hw_ptr` and `appl_ptr` each advanced by **194560 frames over ~4 seconds**, LG Luna codec `dts`. This is the **positive reference** for a future silent first-open, not an acoustic sample or demonstration that the first-start defect was repaired.
+
+**R290 audio LS2:** LG codec `dts`, getSoundOutput `tv_external_speaker`, master volume23, audiooutput source `ADEC0`, sink `MAIN`, `muted=false`, `outputMode="null"`; audiooutput device volume query confirms muted=false and volume23 with soundOutput `tv_external_speaker`. **Do not interpret `outputMode=null` alone as no sound**: the owner previously confirmed audible DTS and direct ALSA PCM6 was RUNNING in this session. OSE audiooutput service semantics may not map one-to-one to LG's proprietary media/DSP output.
+
+**R291 ARC/eARC:** ARC controller replied `arcActivation=not_ready`, `audioDeviceType=none`, `earcATMOS=false`, while getSoundOutput still `tv_external_speaker`. `amixer cget name='Sndout EARC OnOff'` gave `values=0`; `Sndout EARC Outputtype` gave `values=2,1,0,0,1` (vendor-specific, do not decode without verified mapping). Thus **there is no observed active ARC/eARC receiver route in the working session**; avoid blaming initial DTS silence on an HDMI ARC handshake without evidence. A selectable `tv_external_speaker` label is not proof of active ARC.
+
+**Remaining uncertainty / next regression gate:** First silent session may involve initialization timing, player stream selection, resource grant, sink routing or a per-session race. The current healthy audio route **cannot uniquely identify the old fault**. If first-open DTS silence recurs, collect R289+R290+R291 *before* AC3→DTS switching; compare codec recognition, plugin residency, ALSA HW pointer advancement, mute/volume/output and ARC state to this baseline. If identical, these probes still do not measure whether PCM data contain actual nonzero audio; a separately authorized audio-content/meter test or more precise media-pipeline instrumentation would be needed. Cold power cycle, native LG player, seeking, long-play sync and regression are still unverified.
+
+**Status:** live DTS route/stability checked; no production change, no auto-AC3 toggle, no unverified codec-rank or S32LE patch installed.
