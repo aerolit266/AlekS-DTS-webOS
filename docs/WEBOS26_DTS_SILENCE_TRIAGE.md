@@ -124,3 +124,13 @@ Based on the existing read-only renderer diagnostics in `josippapez/dts_restore_
 Script only reports a bounded tail's marker counts, codec/PCM keywords, available DSP decoder **names** and allowlisted Luna fields. No raw movie paths, URLs, user app payloads, raw logs, media control, restart, service or firmware modifications. Run with DTS in the same player and compare to a known-good AC3/AAC track. Native renderer event counts are from the **last 3000 log lines, not an exact time window**; differences are suggestive, not absolute root-cause proof.
 
 VPS verified `sh -n` and checksum; **R284 not yet run on kitchen LG**.
+
+## 2026-11-22: DTS audio begins working after AC3 → DTS track switch (owner report)
+
+**IMPORTANT NEW FIELD RESULT:** The owner first had no audible sound on **three DTS tracks** of *The Matrix*. Without changing our installed plugins or media service configuration, the owner switched the in-player audio track to **AC3**, then back to DTS. **All DTS tracks immediately became audible**. This is the first owner-confirmed live DTS sound on the kitchen LG with the existing AlekS installation. It is **not** proof of clean DTS first-start, reliable multiple cold starts, or successful passthrough of every stream.
+
+**Reasoning (not proven root cause):** The initial DTS-only path may skip or misorder initialization of LG's native output renderer/resource grant or fail to construct a working PCM path. AC3 causes the native Dolby audio branch to initialize/reconfigure the resource/sink; subsequent DTS then has a valid or rebuilt audio route. A related `acquired-resource`/`fakeadec` and decodebin3 track-switch lifecycle issue was documented in `josippapez/dts_restore_plus` webOS25 README on different LG hardware; it is only an analogy, not direct proof here. The R283 Luna codec `dts` and 3 mapped AlekS .so modules proved detection/library loading before audible audio, **not** usable output.
+
+**Next focused regressions:** (1) fully close media playback, restart same DTS track as *first* track without AC3; (2) compare with AC3-first then DTS; (3) switch DTS→DTS, pause/seek and test native player vs Lampa; (4) use read-only R284 renderer-log probe in both silent and audible conditions, preferably after a clean restart of player, and compare. Capture logs while conditions differ, not only after success. Do not change rank, GStreamer libraries or LG firmware based on this result. Don't add artificial AC3 switching as a hidden workaround until cause/side effects are verified.
+
+**Revised status:** `DTS_DECODING_AND_LIVE_SOUND=CONDITIONAL_PASS_AFTER_AC3_SWITCH`, `DIRECT_DTS_FIRST_START=FAIL_OBSERVED`, `ROOT_CAUSE=UNVERIFIED`. Public webOS26 compatibility remains **experimental**, not universal DTS restore.
