@@ -43,16 +43,16 @@ DTS Core 2.0 и 5.1 также прошли изолированные тест�
   curl -fLsS --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 60 \
     -o "$stage/install-universal.sh" \
     'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/main/install-universal.sh'
-  printf '%s  %s\n' 'fa674ae01a879f96c10652592c3da987640c34efa2b50a0119133acb7f3ffb3f' "$stage/install-universal.sh" | sha256sum -c -
+  printf '%s  %s\n' '9c3ce62eeadcd638968a72bd29b3aefbbe349425c0ef739c455ab50c61de3a48' "$stage/install-universal.sh" | sha256sum -c -
   sh "$stage/install-universal.sh" install
 )
 ```
 
-**Совместимость каталога конфигурации:** при установке путь к `umediaserver.env` определяется по реально объявленному `EnvironmentFiles` службы `umediaserver.service`. Если каталог ещё отсутствует, он создаётся только при существующем корневом родительском каталоге и подтверждённом пути в конфигурации службы. Если служба использует другой механизм запуска, установка остановится без догадок. Для диагностики: `sh /tmp/aleks-dts-universal.sh diagnose` (предварительно скачайте скрипт под этим именем).
+**Совместимость каталога конфигурации:** при установке путь к `umediaserver.env` определяется по реально объявленному `EnvironmentFiles` службы `umediaserver.service`. Если подтверждён путь `/var/systemd/system/env/umediaserver.env`, установщик может создать недостающие `/var/systemd`, `/var/systemd/system` и `/var/systemd/system/env` при проверенном владельце `root`, не затрагивая `/etc` и штатные бинарники. При ошибке он удаляет только созданные им пустые каталоги. Если служба использует другой механизм запуска, установка остановится без догадок. Для диагностики: `sh /tmp/aleks-dts-universal.sh diagnose` (предварительно скачайте скрипт под этим именем).
 
 **Проверка без установки:** в последней строке замените `install` на `verify`. Проверка выполняет изолированные тесты декодирования, но не меняет конфигурацию медиасервиса. Для другой модели рекомендуется сначала `verify`.
 
-После сообщения `R278 configured` полностью перезагрузите ТВ. Проверьте DTS Core и обычный AC3, а также телевещание.
+После сообщения `R278 configured` полностью перезагрузите ТВ. Убедитесь, что после перезагрузки каталог `/var/systemd/system/env` и файл `umediaserver.env` сохранились: сохранность `/var` на других моделях пока не проверена. Проверьте DTS Core и обычный AC3, а также телевещание.
 
 **Откат:** при сбое выполните через root SSH:
 
