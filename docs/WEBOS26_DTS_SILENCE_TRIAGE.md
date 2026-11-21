@@ -110,3 +110,17 @@ Created [tools/diagnose-webos26-native-audio-route-r283.sh](../tools/diagnose-we
 Interpretation: `CAPABILITY_REFERENCE_dts=0` may flag a missing uMS DTS resource declaration but is only a substring count, not definitive capability assessment. The LS audio-input-property API may describe the selected input instead of the app's audio stream. Zero journal counts may reflect absent logging. No production changes until decoded PCM and actual LG output path are linked by evidence.
 
 QA of R283 shell script performed on **VPS only**; fake/absent TV resources there are expected and **not kitchen test results**.
+
+## R283 field result — codec detected; sound still silent (2026-11-22)
+
+User ran R283 on actual kitchen LG during DTS playback. `starfish-media-` PID10846 continues to map the three AlekS libraries (decoder, R130 parser, base); second process PID10848 maps none. The native LG resource config `/etc/umediaserver/device_codec_capability_config.json` SHA256 is `053190bf35dc1ce59124b098c5a38683d86a1c33e35c4bddbfdc22334860336c`; case-insensitive substring counts `dts=3,pcm=2,ac3=2,eac3=1`. **Counts indicate codec-related references, not a proven active decoder resource allocation.**
+
+`luna-send` succeeded against `com.webos.service.audio/tv/getAudioInputProperty` with `returnValue=true, codec="dts"`. Thus LG's audio service **recognizes an incoming DTS codec**, but does **not** prove decoded PCM frames reach the actual native audio renderer. Selected journal markers `fakeadec`, `acquired-resource`, `no-resource`, `not-negotiated`, `error`, `failed-to-link`, `no-audio` all matched 0 in the recent bounded system journal check. **Zero log matches do not prove absence of resource failures or silence.**
+
+## Next instrument R284 — native renderer logs, no production changes
+
+Based on the existing read-only renderer diagnostics in `josippapez/dts_restore_plus/webos25/restore/report-tv.sh`, test LG's `/var/log/legacy-log` markers `lgao_push_first_event`, `Caps is first or updated`, `Connect ES Renderer`, `Set pcm`, and `Restart renderer`. These are closer to the native PCM sink path than GStreamer factory inspection alone. Script: [tools/diagnose-webos26-native-sink-r284.sh](../tools/diagnose-webos26-native-sink-r284.sh), commit `8f51108`, SHA256 `29d917f7109e16a5f6162ddc7a2e0d9d39e145f4ea4e1c81d9219890fd62ec7f`.
+
+Script only reports a bounded tail's marker counts, codec/PCM keywords, available DSP decoder **names** and allowlisted Luna fields. No raw movie paths, URLs, user app payloads, raw logs, media control, restart, service or firmware modifications. Run with DTS in the same player and compare to a known-good AC3/AAC track. Native renderer event counts are from the **last 3000 log lines, not an exact time window**; differences are suggestive, not absolute root-cause proof.
+
+VPS verified `sh -n` and checksum; **R284 not yet run on kitchen LG**.
