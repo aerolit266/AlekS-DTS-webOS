@@ -98,7 +98,7 @@ ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubuse
 ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/0c9e34e7c54d3230fda1816ff4bba42c6edbcbe3/tools/install-webos26-preview.sh -o /tmp/aleks-dts-webos26-preview.sh && echo 'bb1401495a1d6950cb7b2026b9ff3a9dc9c7ca166b1f213e67d03aaa45f60b8d  /tmp/aleks-dts-webos26-preview.sh' | sha256sum -c - && sh /tmp/aleks-dts-webos26-preview.sh verify"
 ```
 
-Успех: `RESULT=VERIFIED_ISOLATED_NO_INSTALL`. Статическая сборка патча уже проверена на VPS: `PATCH_ONLY_PASS`, `SYNTAX_PASS`, SHA256 совпал. **Режим установки ещё не испытывался на кухонном LG**; перед его использованием нужны проверка отката и сохранности конфигурации `/var` после перезагрузки, затем отдельное разрешение владельца на изменение `umediaserver.env`. Не используйте обычный `install-universal.sh` на кухне.
+Успех: `RESULT=VERIFIED_ISOLATED_NO_INSTALL`. **Полевой тест PREVIEW `verify` на LG 43NANO85A6A — PASS (22.11.2026):** `PATCH_PASS`, контроль SHA256 всех четырёх плагинов и трёх фикстур, `PASS dts-stereo`, `PASS dts-51`, `PASS ac3-software-augmented`, `RESULT=VERIFIED_ISOLATED_NO_INSTALL`. Режим `install` и откат ещё не испытывались на кухонном LG; перед его использованием нужны проверка отката и сохранности конфигурации `/var` после перезагрузки, затем отдельное разрешение владельца на изменение `umediaserver.env`. Не используйте обычный `install-universal.sh` на кухне.
 
 ## Как установить
 
