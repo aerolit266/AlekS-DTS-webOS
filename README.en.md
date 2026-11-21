@@ -24,7 +24,7 @@ DTS Core 2.0 and 5.1 also passed isolated tests. DTS-HD MA, DTS:X, DTS passthrou
 | LG 65NANO896PC · 03.60.96 · webOS TV 6.6.0 · ARMv7 · GStreamer 1.16.2 | DTS Core 5.1 verified on real hardware |
 | LG UP75006LF · ARMv7 · R278 | **Installation and DTS playback confirmed by owner:** `R278 configured`, isolated DTS 2.0 / DTS 5.1 / AC3 tests PASS, and owner reports everything working after installation. Separate Live TV regression results and persistence across multiple reboots are not documented |
 | Other LG ARMv7 TVs with native umediaserver / GStreamer | No model or firmware lock. The installer runs isolated DTS 2.0, DTS 5.1 and AC3 tests before enabling. Native-player playback still needs device-specific verification |
-| 64-bit Linux kernel + 32-bit ARM media userland (e.g. LG 43NANO85A6A, webOS 26) | Never infer plugin ABI from `uname -m`: inspect ELF class and e_machine for umediaserver and GStreamer. R278 targeting GStreamer 1.16.2 is **untested** against GStreamer 1.24.10 and is rejected by the current installer |\n| 64-bit native media process / different CPU ABI | Requires a build matching the actual native media process ABI |
+| LG 43NANO85A6A · webOS 26 · 32-bit ARM media userland on ARM64 kernel · GStreamer 1.24.10 | **Isolated DTS 2.0/5.1 and software AC3 PASS**; native-player playback and installation remain untested. The original R278 installer must not be used; a dedicated frontend is required |\n| 64-bit native media process / different CPU ABI | Requires a build matching the actual native media process ABI |
 | Different media pipeline/ABI, or modified media configuration | Installer must refuse before changing media-service configuration |
 
 Root SSH and an existing Homebrew setup are required. No system libraries or firmware are replaced. A successful isolated GStreamer test does not guarantee correct sound on every built-in player.
@@ -87,6 +87,18 @@ ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubuse
 ```
 
 Even `RESULT=PREFLIGHT_READY_FOR_BACKUP_AND_STAGED_TEST; NO_INSTALL` is **not installation approval**. A backup, dedicated installer and rollback, `/var` persistence verification after reboot, and native-player testing are still required. The original R278 installer still rejects the kernel architecture and has an outdated AC3 assertion.
+
+### Kitchen LG dedicated installer (PREVIEW, no media service changes)
+
+For **LG 43NANO85A6A, firmware 43.22.74**, a dedicated frontend adapts the SHA256-pinned R278 archive. It verifies actual media ELF32 ARM, GStreamer 1.24.10, BusyBox timeout compatibility, DTS Core stereo/5.1, software AC3 and current `umediaserver` configuration. Original R278 environment-backup and rollback logic is retained.
+
+**Run `verify` mode only at this stage.** The script uses a temporary `/tmp` directory without changing the native media service.
+
+```powershell
+ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/0c9e34e7c54d3230fda1816ff4bba42c6edbcbe3/tools/install-webos26-preview.sh -o /tmp/aleks-dts-webos26-preview.sh && echo 'bb1401495a1d6950cb7b2026b9ff3a9dc9c7ca166b1f213e67d03aaa45f60b8d  /tmp/aleks-dts-webos26-preview.sh' | sha256sum -c - && sh /tmp/aleks-dts-webos26-preview.sh verify"
+```
+
+Success: `RESULT=VERIFIED_ISOLATED_NO_INSTALL`. Offline patch assembly already passed `PATCH_ONLY_PASS`, `SYNTAX_PASS` and SHA256 checks on VPS. **The actual installation mode has not yet been tested on the kitchen TV**. Rollback, `/var` persistence after reboot and explicit owner authorization to modify `umediaserver.env` remain required. Do not use the old `install-universal.sh` on this TV.
 
 ## Installation
 
