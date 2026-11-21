@@ -152,3 +152,17 @@ During owner-confirmed audible DTS session, new starfish-media PID20727 mapped l
 R284 renderer log probes found no selected events in last 3000 legacy-log lines, DSP proc directory unavailable: does NOT disprove audible playback. User confirmed sound after completely closing and reopening movie without any AC3 switch. Independently reran hash-pinned runtime script, PASS installed.env/registry/plugins integrity, env matches, umediaserver active, all live GST_PLUGIN_PATH_1_0/GST_REGISTRY_1_0/GST_REGISTRY_UPDATE/ALEKS_DTS_R130_ALLOW_AUTOPLUG settings. Sound is owner-observed, not a connector acoustic measurement.
 
 STATUS: REPEAT DTS START LIVE AUDIO OWNER-PASS; CONFIG AND LIVE MEDIA PIPELINE VERIFIED; FIRST SILENT SESSION INTERMITTENT/UNKNOWN; FULL TV POWER-CYCLE AND MULTI-FILE REGRESSIONS NOT VERIFIED.
+
+## R285 field stability monitor (2026-11-22, read-only)
+
+New script: [tools/monitor-webos26-dts-runtime-r285.sh](../tools/monitor-webos26-dts-runtime-r285.sh), commit `d2ed98a00390dc8cd0543f33c3dcf620d95801bc`, SHA256 `86db4976c18525ad3131209616bf189e01a7036a5fe5dd2aee2e38c78bc60526`. Shell syntax and absence of destructive commands checked on VPS. Executed **directly on kitchen TV via existing AlekS Core route**; SHA256 verified on target.
+
+| Sample | uMS PID/RSS KiB | Starfish active PID/RSS KiB/threads/CPU ticks | Other starfish PID/RSS KiB | audiooutputd PID | Luna codec |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 1214 / 3384 | 20727 / 124216 / 72 / 35744 | 20737 / 7020 | 439 | dts |
+| 2 | 1214 / 3384 | 20727 / 124216 / 72 / 36656 | 20737 / 7020 | 439 | dts |
+| 3 | 1214 / 3384 | 20727 / 124216 / 72 / 37627 | 20737 / 7020 | 439 | dts |
+
+All three AlekS DTS plugins (`libgstaleksdts.so`, `libgstaleksdtsr130optin.so`, `libgstaleksdts16dec.so`) remained mapped in active Starfish PID 20727 in all 3 samples. umediaserver and audiooutputd services remained active, no PID changes. Starfish RSS and threads remained unchanged, its CPU ticks grew (process actively executing), but without precise times/scheduler statistics we cannot attribute CPU load to DTS decoding alone. No service changes or player interactions; 3 samples separated by ~5 seconds each, **not a full long-play stability test**.
+
+**Status:** R285 stability probe PASS for process persistence, library residency and no short-window RSS growth. Actual acoustic output remains owner-confirmed, not an independently observed audio sample. Cold-boot DTS-first path and long-play seek/track regression NOT YET VERIFIED.
