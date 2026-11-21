@@ -6,6 +6,12 @@
 
 **AlekS DTS R277** adds DTS Core decoding to the native LG webOS media pipeline. Support loads automatically when the TV starts. For the tested DTS 5.1 track, the native audio sink received six-channel PCM S16LE at 48 kHz.
 
+## For other LG owners
+
+Identify the **actual native media process ELF architecture**, GStreamer and `umediaserver` configuration before installation. Some newer TVs use a 64-bit Linux kernel but a 32-bit native media pipeline. Isolated audio tests are mandatory. See the [model compatibility matrix, safe discovery tool and rollback procedure](PUBLIC-COMPATIBILITY.md).
+
+**The kitchen TV installer is a field-test candidate, not a universal release.** It checks the verified model's effective eMMC partition `/dev/mmcblk0p59`; do not run it on other LG models.
+
 ## Verified results
 
 | Device or scenario | Result |
