@@ -12,7 +12,7 @@ installed='/var/lib/webosbrew/aleks-dts-r278/install.sh'
 
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
-[ "$#" -eq 1 ] || fail 'Usage: sh install-universal.sh verify | install | rollback'
+[ "$#" -eq 1 ] || fail 'Usage: sh install-universal.sh diagnose | verify | install | rollback'
 case "$1" in
     rollback)
         [ "$(id -u)" = 0 ] || fail 'Root SSH is required.'
@@ -20,7 +20,18 @@ case "$1" in
         exec sh "$installed" rollback
         ;;
     install|verify) action=$1 ;;
-    *) fail 'Usage: sh install-universal.sh verify | install | rollback' ;;
+    diagnose)
+        printf '=== DEVICE ===\n'
+        uname -m
+        printf '=== MEDIA SERVICE ===\n'
+        systemctl show umediaserver.service -p LoadState -p ActiveState -p FragmentPath -p DropInPaths -p EnvironmentFiles 2>&1 || :
+        printf '=== CONFIGURATION DIRECTORIES ===\n'
+        for d in /var/systemd/system /var/systemd/system/env /etc/systemd/system /var/lib/webosbrew; do
+            if [ -e "$d" ] || [ -L "$d" ]; then ls -ld "$d"; else printf 'MISSING %s\n' "$d"; fi
+        done
+        exit 0
+        ;;
+    *) fail 'Usage: sh install-universal.sh diagnose | verify | install | rollback' ;;
 esac
 
 [ "$(id -u)" = 0 ] || fail 'Root SSH is required.'
@@ -30,7 +41,13 @@ for tool in curl sha256sum tar awk grep mktemp sh; do
 done
 
 stage=$(mktemp -d /tmp/aleks-dts-universal.XXXXXX) || fail 'Cannot create temporary directory.'
-trap 'rm -rf -- "$stage"' EXIT
+cleanup() {
+    rm -rf -- "$stage"
+    if [ -n "${created_env_dir:-}" ] && [ ! -e "${config_path:-}" ]; then
+        rmdir "$created_env_dir" 2>/dev/null || :
+    fi
+}
+trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
 cd "$stage"
 
@@ -42,6 +59,61 @@ tar -xmzf release.tar.gz || fail 'Cannot unpack archive.'
 grep -Fq "fail 'Unsupported model or firmware.'" install.sh || fail 'Unexpected R278 installer: refusing an unverified patch.'
 grep -Fq 'hash 46a353723ec66894596d9ce0822c3f2273422731ad0426fc6ff16beb349162bc /usr/sbin/umediaserver' install.sh ||
     fail 'Unexpected firmware compatibility checks: refusing an unverified patch.'
+
+# Derive the native service's declared environment path rather than assuming
+# a folder borrowed from one TV model. No service modification or new drop-in.
+config_path=''
+created_env_dir=''
+if [ "$action" = install ]; then
+    command -v systemctl >/dev/null 2>&1 || fail 'systemctl is missing.'
+    env_line=$(systemctl show umediaserver.service -p EnvironmentFiles) ||
+        fail 'Cannot inspect umediaserver.service environment files.'
+    case "$env_line" in EnvironmentFiles=*) ;; *)
+        fail 'Unknown service environment format; run diagnose and report its output.' ;;
+    esac
+    env_paths=${env_line#EnvironmentFiles=}
+    for entry in $env_paths; do
+        case "$entry" in
+            /*/umediaserver.env|-/*/umediaserver.env)
+                candidate=${entry#-}
+                case "$candidate" in
+                    *[!A-Za-z0-9._/-]*) fail 'Unsafe environment-file path in service.' ;;
+                esac
+                case "$candidate" in
+                    /var/*|/etc/systemd/*) ;;
+                    *) fail 'Unsupported environment-file location; run diagnose.' ;;
+                esac
+                if [ -n "$config_path" ] && [ "$config_path" != "$candidate" ]; then
+                    fail 'Ambiguous service environment files; run diagnose.'
+                fi
+                config_path=$candidate
+                ;;
+        esac
+    done
+    [ -n "$config_path" ] ||
+        fail 'umediaserver.service does not declare an umediaserver.env file. Run diagnose; a different integration method is required.'
+    dir=${config_path%/*}
+    if [ ! -d "$dir" ]; then
+        [ ! -e "$dir" ] && [ ! -L "$dir" ] ||
+            fail 'Environment directory is not a regular directory.'
+        parent=${dir%/*}
+        [ -d "$parent" ] && [ ! -L "$parent" ] ||
+            fail 'Environment directory parent is absent or is a symlink. Run diagnose.'
+        [ "$(stat -c %u "$parent")" = 0 ] ||
+            fail 'Environment directory parent must be owned by root.'
+        mkdir -m 0755 "$dir" ||
+            fail 'Could not create the service-declared environment directory.'
+        created_env_dir=$dir
+        printf 'Created service-declared environment directory: %s\n' "$dir"
+    fi
+    [ ! -L "$dir" ] && [ "$(stat -c %u "$dir")" = 0 ] ||
+        fail 'Environment directory must be a root-owned real directory.'
+    if [ -e "$config_path" ] || [ -L "$config_path" ]; then
+        [ -f "$config_path" ] && [ ! -L "$config_path" ] ||
+            fail 'Unsafe pre-existing media environment file.'
+    fi
+    printf 'Verified media environment path: %s\n' "$config_path"
+fi
 
 # Replace only the original platform() gate. All integrity checks for shipped
 # plugins, protected systemd configuration and recovery logic remain unchanged.
@@ -75,6 +147,20 @@ if grep -Fq 'Unsupported model or firmware.' install.patched ||
    grep -Fq '46a353723ec66894596d9ce0822c3f2273422731ad0426fc6ff16beb349162bc' install.patched; then
     fail 'Fixed-firmware checks remain after patch.'
 fi
+# The R278 archive hardcodes one media-service environment path. Replace
+# that exact assignment with the path declared by THIS TV's systemd unit.
+if [ "$action" = install ]; then
+    awk -v discovered="$config_path" '
+        /^config=\/var\/systemd\/system\/env\/umediaserver.env$/ {
+            count++; print "config=" discovered; next
+        }
+        { print }
+        END { if (count != 1) exit 70 }
+    ' install.patched > install.portable ||
+        fail 'Could not replace the old fixed media configuration path.'
+    mv install.portable install.patched
+fi
+sh -n install.patched || fail 'Portable installer has a shell syntax error.'
 mv install.patched install.sh
 chmod 0700 install.sh
 printf 'AlekS DTS R278 universal: model/firmware gate removed.\n'
