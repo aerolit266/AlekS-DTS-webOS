@@ -23,6 +23,8 @@ sh /tmp/aleks-dts-compat.sh
 
 Присылайте в [Issues](https://github.com/aerolit266/AlekS-DTS-webOS/issues) модель, webOS, фактический ELF ABI, GStreamer, статус встроенного AC3 и тестовый результат. Секреты, ключи SSH, содержимое `umediaserver.env` и приватные данные **не публикуйте**.
 
+**R292 — уточнение источника PCM:** единственный активный PulseAudio sink-input принадлежит `WebAppMgr` PID3217, а DTS плагины загружены в `starfish-media` PID20727. Аппаратный ALSA-выход активен, но **не прослежена прямая цепочка DTS → PulseAudio → ALSA**; R286–R291 нельзя использовать как независимый тест содержимого DTS-PCM. Реальный звук подтверждён пользователем. [R292](tools/inspect-webos26-pulse-dts-r292.sh).
+
 **Эталон аудиомаршрута R289–R291 (22.11.2026):** у работающего DTS на кухонном LG `codec=dts`, ALSA PCM6 RUNNING, `muted=false`, `volume=23`, выбран `tv_external_speaker`, маршрут `ADEC0→MAIN`. ARC `not_ready`, подключённых ARC-устройств нет, eARC mixer OnOff=0. Это показывает состояние при успешном воспроизведении; **не доказывает первопричину исторической тишины**. [Подробный отчёт](docs/WEBOS26_DTS_SILENCE_TRIAGE.md).
 
 **R287, 22.11.2026 — повторная проверка 65 секунд:** 6/6 измерений `starfish-media` PID20727 и три DTS-модуля стабильны, `umediaserver`/`audiooutputd` активны, `codec=dts` 6/6. ALSA PCM6 `RUNNING` 6/6, аппаратный указатель увеличился на 3 121 152 кадра за 65 секунд (порядка 48 кГц); RSS процесса 118024→118032 КиБ (+8 КиБ), без смены PID. **Это проверка воспроизведения и буфера, не запись ненулевого аудиосигнала.** [R287 read-only](tools/monitor-webos26-dts-output-r287.sh).
