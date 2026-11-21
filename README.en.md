@@ -59,8 +59,10 @@ The LG 43NANO85A6A can run an **isolated** compatibility test of all four existi
 From TORMOZ PowerShell, using the already configured webOS SDK profile:
 
 ```powershell
-ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/main/tools/verify-r278-webos26.sh -o /tmp/aleks-dts-verify.sh && echo '6e8dd4f813ca154b31ba96d8113b2c64a34e089dbdca11772858d6e5a7613f81  /tmp/aleks-dts-verify.sh' | sha256sum -c - && sh /tmp/aleks-dts-verify.sh"
+ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/d0554defd64bd2831a2bc06e7edc65a1370e7b36/tools/verify-r278-webos26.sh -o /tmp/aleks-dts-verify.sh && echo '6e8dd4f813ca154b31ba96d8113b2c64a34e089dbdca11772858d6e5a7613f81  /tmp/aleks-dts-verify.sh' | sha256sum -c - && sh /tmp/aleks-dts-verify.sh"
 ```
+
+**Why the URL pins a commit instead of `main`:** On 2026-11-22 GitHub raw CDN served a stale `main` copy with SHA256 `279f8f...`, although the repository already had the corrected file. Commit `d0554def...` was fetched and verified with SHA256 `6e8dd4f8...`. Never run a script whose SHA256 does not match.
 
 A `PASS ISOLATED R278 ON GSTREAMER 1.24 (NO INSTALL)` result demonstrates only separate-process fixture compatibility, **not** native-player functionality. Failures stop without enabling plugins and include a short diagnostic log excerpt.
 
