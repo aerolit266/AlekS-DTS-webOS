@@ -33,7 +33,7 @@ Test a DTS Core file in the native player first; your TV may already support it.
 
 ## webOS 26: ARM32 media userland on a 64-bit kernel
 
-**Confirmed on LG 43NANO85A6A, firmware 43.22.74:** `uname -m = aarch64`, while `/usr/sbin/umediaserver` and `/usr/bin/gst-inspect-1.0` have ELF class `1` (32-bit) and little-endian encoding; GStreamer `1.24.10`, runtime `libgstreamer-1.0.so.0.2410.0`. Exact CPU ABI (ELF e_machine) and dynamic dependencies are not yet checked. **Do not build ARM64 plugins based solely on the kernel architecture**: plugins must match the 32-bit media process ABI and GStreamer 1.24.10.
+**Confirmed on LG 43NANO85A6A, firmware 43.22.74:** `uname -m = aarch64`, while `/usr/sbin/umediaserver` and `/usr/bin/gst-inspect-1.0` have ELF class `1` (32-bit) and little-endian encoding; GStreamer `1.24.10`, runtime `libgstreamer-1.0.so.0.2410.0`. ELF `e_machine = 40 (EM_ARM)` is additionally confirmed for all three components. ABI calling convention, library and dynamic-loader compatibility with the R278 plugins are still unverified. **Do not build ARM64 plugins based solely on the kernel architecture**: plugins must match the 32-bit media process ABI and GStreamer 1.24.10.
 
 No `dtsdec`/`avdec_dca` element, matching DTS mounts or DTS Restore files in the tested standard locations were found. This does not prove that a nonstandard DTS Restore or built-in decoder is absent. No TV modifications were made.
 
