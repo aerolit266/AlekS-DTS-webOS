@@ -24,7 +24,8 @@ DTS Core 2.0 and 5.1 also passed isolated tests. DTS-HD MA, DTS:X, DTS passthrou
 | LG 65NANO896PC · 03.60.96 · webOS TV 6.6.0 · ARMv7 · GStreamer 1.16.2 | DTS Core 5.1 verified on real hardware |
 | LG UP75006LF · ARMv7 · R278 | **Installation and DTS playback confirmed by owner:** `R278 configured`, isolated DTS 2.0 / DTS 5.1 / AC3 tests PASS, and owner reports everything working after installation. Separate Live TV regression results and persistence across multiple reboots are not documented |
 | Other LG ARMv7 TVs with native umediaserver / GStreamer | No model or firmware lock. The installer runs isolated DTS 2.0, DTS 5.1 and AC3 tests before enabling. Native-player playback still needs device-specific verification |
-| LG 43NANO85A6A · webOS 26 · 32-bit ARM media userland on ARM64 kernel · GStreamer 1.24.10 | **Isolated DTS 2.0/5.1 and software AC3 PASS**; native-player playback and installation remain untested. The original R278 installer must not be used; a dedicated frontend is required |\n| 64-bit native media process / different CPU ABI | Requires a build matching the actual native media process ABI |
+| LG 43NANO85A6A · webOS 26 · 32-bit ARM media userland on ARM64 kernel · GStreamer 1.24.10 | **Isolated DTS 2.0/5.1 and software AC3 PASS**; native-player playback and installation remain untested. The original R278 installer must not be used; a dedicated frontend is required |
+| 64-bit native media process / different CPU ABI | Requires a build matching the actual native media process ABI |
 | Different media pipeline/ABI, or modified media configuration | Installer must refuse before changing media-service configuration |
 
 Root SSH and an existing Homebrew setup are required. No system libraries or firmware are replaced. A successful isolated GStreamer test does not guarantee correct sound on every built-in player.
@@ -33,9 +34,9 @@ Test a DTS Core file in the native player first; your TV may already support it.
 
 ## webOS 26: ARM32 media userland on a 64-bit kernel
 
-**Confirmed on LG 43NANO85A6A, firmware 43.22.74:** `uname -m = aarch64`, while `/usr/sbin/umediaserver` and `/usr/bin/gst-inspect-1.0` have ELF class `1` (32-bit) and little-endian encoding; GStreamer `1.24.10`, runtime `libgstreamer-1.0.so.0.2410.0`. ELF `e_machine = 40 (EM_ARM)` is additionally confirmed for all three components. ABI calling convention, library and dynamic-loader compatibility with the R278 plugins are still unverified. **Do not build ARM64 plugins based solely on the kernel architecture**: plugins must match the 32-bit media process ABI and GStreamer 1.24.10.
+**Confirmed on LG 43NANO85A6A, firmware 43.22.74:** `uname -m = aarch64`, while `/usr/sbin/umediaserver` and `/usr/bin/gst-inspect-1.0` have ELF class `1` (32-bit) and little-endian encoding; GStreamer `1.24.10`, runtime `libgstreamer-1.0.so.0.2410.0`. ELF `e_machine = 40 (EM_ARM)` is additionally confirmed for all three components. Both key DTS plugins loaded and DTS 2.0/5.1 decoding succeeded on GStreamer 1.24.10; native `umediaserver` integration is still unverified. **Do not build ARM64 plugins based solely on the kernel architecture**: plugins must match the 32-bit media process ABI and GStreamer 1.24.10.
 
-No `dtsdec`/`avdec_dca` element, matching DTS mounts or DTS Restore files in the tested standard locations were found. This does not prove that a nonstandard DTS Restore or built-in decoder is absent. No TV modifications were made.
+No `dtsdec`/`avdec_dca` element, matching DTS mounts or DTS Restore files in the tested standard locations were found. This does not prove that a nonstandard DTS Restore or built-in decoder is absent. No media-service or configuration changes were made on the TV; diagnosis used temporary files only.
 
 **Field tests, 2026-11-22:** ELF32 ARM, GStreamer 1.24.10 and archive/fixture SHA256 checks passed; `aleksdtsr130optin` and `aleksdts16dec` loaded; **DTS 2.0 and DTS 5.1 PASS**. Native `GstOMXAC3Dec` produced PCM S16LE/48 kHz and `Got EOS` both with and without AlekS DTS plugins, but the process stalled during teardown and was terminated by timeout (exit 143). This is **not evidence of failed AC3 decoding**. Clean-shutdown AC3 and native-player integration remain unverified. **Nothing was installed.**
 
@@ -88,7 +89,7 @@ ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubuse
 
 Even `RESULT=PREFLIGHT_READY_FOR_BACKUP_AND_STAGED_TEST; NO_INSTALL` is **not installation approval**. A backup, dedicated installer and rollback, `/var` persistence verification after reboot, and native-player testing are still required. The original R278 installer still rejects the kernel architecture and has an outdated AC3 assertion.
 
-**Kitchen LG storage inspection (2026-11-22):** `/` is read-only SquashFS (1.5 GB, 100% as expected for firmware image), `/var` and `/var/lib/webosbrew` are OverlayFS (720.8 MB total, 107.2 MB used, 561 MB available). Capacity is adequate but **persistence across a full reboot is unproven**: inspect `/proc/self/mountinfo` for the overlay `upperdir` and the underlying filesystem. Do not run `install` until verified.
+**Confirmed from `/proc/self/mountinfo` (2026-11-22):** `/` is read-only SquashFS; `/var` first has a lower read-only OverlayFS (`lowerdir=/overlay/bsppart/bsp/var:/var`), but a **writable ext4 mount backed by physical eMMC `/dev/mmcblk0p59`** overrides it (mount ID 71, root `/var`). `/var/lib/webosbrew` uses the effective mounted storage; around 561 MB is available. **This is persistent block storage, not RAM**. Persistence of particular files after a full reboot is still to be confirmed because boot maintenance may clean temporary directories. The PREVIEW installer now blocks activation if this effective `/var` mount differs.
 
 ### Kitchen LG dedicated installer (PREVIEW, no media service changes)
 
@@ -97,10 +98,10 @@ For **LG 43NANO85A6A, firmware 43.22.74**, a dedicated frontend adapts the SHA25
 **Run `verify` mode only at this stage.** The script uses a temporary `/tmp` directory without changing the native media service.
 
 ```powershell
-ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/0c9e34e7c54d3230fda1816ff4bba42c6edbcbe3/tools/install-webos26-preview.sh -o /tmp/aleks-dts-webos26-preview.sh && echo 'bb1401495a1d6950cb7b2026b9ff3a9dc9c7ca166b1f213e67d03aaa45f60b8d  /tmp/aleks-dts-webos26-preview.sh' | sha256sum -c - && sh /tmp/aleks-dts-webos26-preview.sh verify"
+ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/cb18937bee85c422f81bc31e4aab15d9d1fda8db/tools/install-webos26-preview.sh -o /tmp/aleks-dts-webos26-preview.sh && echo '7883bdb5195ce5af13837cb65b9c9a79e6224f7d830a0cb4aa9dccf456789ae0  /tmp/aleks-dts-webos26-preview.sh' | sha256sum -c - && sh /tmp/aleks-dts-webos26-preview.sh verify"
 ```
 
-Success: `RESULT=VERIFIED_ISOLATED_NO_INSTALL`. **Kitchen LG 43NANO85A6A field verification PASS (2026-11-22):** `PATCH_PASS`, SHA256 of all four plugins and three fixtures, `PASS dts-stereo`, `PASS dts-51`, `PASS ac3-software-augmented`, `RESULT=VERIFIED_ISOLATED_NO_INSTALL`. Actual `install` and rollback have not been tested on the kitchen TV. Rollback, `/var` persistence after reboot and explicit owner authorization to modify `umediaserver.env` remain required. Do not use the old `install-universal.sh` on this TV.
+Success: `RESULT=VERIFIED_ISOLATED_NO_INSTALL`. **Kitchen LG 43NANO85A6A field verification PASS (2026-11-22):** `PATCH_PASS`, SHA256 of all four plugins and three fixtures, `PASS dts-stereo`, `PASS dts-51`, `PASS ac3-software-augmented`, `RESULT=VERIFIED_ISOLATED_NO_INSTALL`. Actual `install` and rollback have not been tested on the kitchen TV. **PREVIEW release with eMMC guard:** commit `cb18937`, SHA256 `7883bdb5...`. VPS `patch-check` passed; an earlier PREVIEW `verify` passed on the kitchen LG. Activation-path eMMC guard has not been run on the kitchen TV. **Changing `umediaserver.env` requires explicit approval.** Rollback, `/var` persistence after reboot and explicit owner authorization to modify `umediaserver.env` remain required. Do not use the old `install-universal.sh` on this TV.
 
 ## Installation
 
