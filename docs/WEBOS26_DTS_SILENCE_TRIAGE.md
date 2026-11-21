@@ -242,3 +242,25 @@ All commands were executed **on the kitchen LG** through the existing GameFree24
 **Remaining uncertainty / next regression gate:** First silent session may involve initialization timing, player stream selection, resource grant, sink routing or a per-session race. The current healthy audio route **cannot uniquely identify the old fault**. If first-open DTS silence recurs, collect R289+R290+R291 *before* AC3→DTS switching; compare codec recognition, plugin residency, ALSA HW pointer advancement, mute/volume/output and ARC state to this baseline. If identical, these probes still do not measure whether PCM data contain actual nonzero audio; a separately authorized audio-content/meter test or more precise media-pipeline instrumentation would be needed. Cold power cycle, native LG player, seeking, long-play sync and regression are still unverified.
 
 **Status:** live DTS route/stability checked; no production change, no auto-AC3 toggle, no unverified codec-rank or S32LE patch installed.
+
+## R292: actual PulseAudio sink-input ownership vs DTS Starfish (2026-11-22)
+
+**Important provenance correction** to R286–R291: live ALSA `pcm_output` running at S16LE stereo 48 kHz with advancing `hw_ptr` is a **real audio output**, but **alone does not prove that those samples are Starfish-decoded DTS**. A PulseAudio sink input may originate from web application audio independently of the native LG media pipeline. The owner has heard DTS, but no instrumented direct decoder→sink lineage is yet proven.
+
+The R292 source [tools/inspect-webos26-pulse-dts-r292.sh](../tools/inspect-webos26-pulse-dts-r292.sh), final commit `f5d54b5516404ac2a7113af5c13ee4491f3ac3b9`, SHA256 `29b2e9324ff7e2425bbcf1b24ea147e0f4fdc4c7f2c26f3a3c53d591c40367d3`, passed VPS `sh -n`, synthetic short-sink parser test and on-TV SHA256, and was executed via the existing AlekS Core→TORMOZ→LG read-only route.
+
+Measured under working video session:
+
+| Layer | Observed process or signal | Evidence |
+| --- | --- | --- |
+| DTS GStreamer | Starfish PID20727 | `libgstaleksdts16dec.so` mapped; no proof decoder element instance is currently active |
+| PulseAudio app stream | sink-input #5; `application.process.id=3217` | `/proc/3217/comm=WebAppMgr`, **different from Starfish PID20727**; input sink=1, 2ch S16LE 48000Hz, `Corked=no`, `Mute=no` |
+| PulseAudio hardware sink | `pcm_output` (sink #1) | module-alsa-sink.c, RUNNING S16LE 2ch 48000Hz |
+| Latency (at R292 capture) | buffer=64000µs, sink=23364µs | momentary reported latency, not measured A/V sync |
+| LG native audio service | codec=dts, source=ADEC0→sink=MAIN, muted=false, outputMode=null | read-only Luna getAudioInputProperty and audiooutput getStatus |
+
+The first R292 run incorrectly parsed `pactl list short sinks` due to the sample spec spanning **three whitespace tokens** (`s16le 2ch 48000Hz`). The corrected script prints `FORMAT=s16le 2ch 48000Hz STATE=RUNNING`, verified on actual LG.
+
+**Do not infer** either that (a) Starfish DTS necessarily flows through the WebAppMgr PulseAudio sink input, or that (b) it bypasses PulseAudio. Both could occur via IPC, shared buffers or separate proprietary DSP paths; current evidence only identifies independent process owners. Similarly `outputMode=null` is observed in a working session and cannot be used as a sole failure marker.
+
+**Root cause status:** first-open silence remains unexplained. A proper A/B failure capture would compare live Starfish decoder instance, native sink ownership, muting, and PCM sample flow before/after AC3 switching. Until reproduced, do not patch rank, DTS parser/decoder, S16/S32 converter, system services or first-track behavior speculatively. Acoustically verified output still derives from the owner's report, not the `pactl`/ALSA tests.
