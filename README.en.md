@@ -70,13 +70,23 @@ A `PASS ISOLATED R278 ON GSTREAMER 1.24 (NO INSTALL)` result demonstrates only s
 
 **Confirmed from device logs:** both `native` and `augmented` autoplugged `GstOMXAC3Dec`, produced PCM S16LE/48 kHz (negotiated channels changed 6 → 8), and reached `Got EOS` after about 0.2 s. The process then stalled in teardown and was terminated by the 20 s timeout (`exit=143`). The previous `FAIL_BOTH` label was a **false inference about AC3 decoding**. The `invalid property id 20 for downmix` warning and OMX teardown delay deserve separate diagnosis; no evidence connects them specifically to AlekS DTS.
 
-New **R2 isolated verification** explicitly uses the TV's discovered software `avdec_ac3`, running AC3 with and without AlekS DTS plugins. It requires EOS, PCM/48 kHz, clean exit, and no DTS decoder selected for AC3. DTS stereo/5.1 and SHA256 checks remain. It never alters `umediaserver`, mounts, services or persistent configuration.
+**R2 passed on the kitchen LG 43NANO85A6A:** `dts-stereo`, `dts-51`, `ac3-software-native`, and `ac3-software-augmented` all PASS. Software `avdec_ac3` produced 48 kHz PCM, reached EOS, and exited cleanly in both modes. Archive and all seven individual fixture/plugin SHA256 checks passed. These are **isolated GStreamer tests**, not native-player DTS verification. It never alters `umediaserver`, mounts, services or persistent configuration.
 
 ```powershell
 ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/d050fb7294b4414bc36fe861779eaa1497876ac4/tools/verify-r278-webos26-r2.sh -o /tmp/aleks-dts-r2.sh && echo '1ecd5fbd8698c9c2d15612c6460e325d0c6621041fb1a836c1e1dac8c1b10ea3  /tmp/aleks-dts-r2.sh' | sha256sum -c - && sh /tmp/aleks-dts-r2.sh"
 ```
 
 Success: `RESULT=PASS_DTS_AND_AC3_SOFTWARE_ISOLATED; NO_INSTALL`. On failure: `RESULT=AC3_REGRESSION_NOT_CLEARED; NO_INSTALL`. Neither result alone authorizes native media installation; hardware OMX and native player require separate verification.
+
+### Native-media integration preparation (read-only)
+
+Before backup and a dedicated webOS 26 installer, inspect the real `umediaserver` `EnvironmentFiles`, writable configuration directory structure, existing plugin configuration, root ownership and any DTS Restore artifacts. This preflight changes no files or services:
+
+```powershell
+ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/1c53eb1ea0f7c69c377a383a2680ecac1c7e4e91/tools/preflight-webos26-integration.sh -o /tmp/aleks-dts-preflight.sh && echo '39804c08eca95a444dc8189def1273db6c4acb5b338f4ab324c4ab7f22edf41d  /tmp/aleks-dts-preflight.sh' | sha256sum -c - && sh /tmp/aleks-dts-preflight.sh"
+```
+
+Even `RESULT=PREFLIGHT_READY_FOR_BACKUP_AND_STAGED_TEST; NO_INSTALL` is **not installation approval**. A backup, dedicated installer and rollback, `/var` persistence verification after reboot, and native-player testing are still required. The original R278 installer still rejects the kernel architecture and has an outdated AC3 assertion.
 
 ## Installation
 
