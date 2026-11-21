@@ -70,13 +70,23 @@ ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubuse
 
 **Подтверждено по журналу устройства:** и `native`, и `augmented` использовали `GstOMXAC3Dec`, вывели PCM S16LE/48 кГц (при согласовании каналов 6 → 8) и достигли `Got EOS` за ~0.2 с. Через 20 с процесс был принудительно завершён при освобождении декодера: `exit=143`, поэтому прежний статус `FAIL_BOTH` — ложный вывод о **декодировании AC3**. Предупреждение `invalid property id 20 for downmix` и задержка освобождения OMX заслуживают отдельного исследования, но не доказано, что они вызваны AlekS DTS.
 
-Создан **R2: изолированный контроль AC3 через явно выбранный `avdec_ac3`**, доступный на телевизоре. Он запускает AC3 отдельно без AlekS и с ними, проверяет EOS, PCM/48 кГц, чистое завершение и отсутствие DTS-декодера в AC3-цепочке. Контроль DTS 2.0/5.1 и SHA256 сохранён. Скрипт **не меняет** `umediaserver`, монтирования, службы или постоянную конфигурацию.
+**R2 проверен на кухонном LG 43NANO85A6A:** `dts-stereo` PASS, `dts-51` PASS, `ac3-software-native` PASS и `ac3-software-augmented` PASS. `avdec_ac3` выдаёт PCM 48 кГц, достигает EOS и завершает процесс штатно в обоих режимах. Контроль SHA256 архива и семи отдельных файлов прошёл. Это подтверждение **изолированных тестов**, а не работы DTS в штатном медиаплеере. Скрипт **не меняет** `umediaserver`, монтирования, службы или постоянную конфигурацию.
 
 ```powershell
 ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/d050fb7294b4414bc36fe861779eaa1497876ac4/tools/verify-r278-webos26-r2.sh -o /tmp/aleks-dts-r2.sh && echo '1ecd5fbd8698c9c2d15612c6460e325d0c6621041fb1a836c1e1dac8c1b10ea3  /tmp/aleks-dts-r2.sh' | sha256sum -c - && sh /tmp/aleks-dts-r2.sh"
 ```
 
 Успешный результат: `RESULT=PASS_DTS_AND_AC3_SOFTWARE_ISOLATED; NO_INSTALL`. При ошибке ожидается `RESULT=AC3_REGRESSION_NOT_CLEARED; NO_INSTALL`; такой тест ещё не разрешает установку. Аппаратный OMX AC3 и штатный медиаплеер остаются отдельными пунктами проверки.
+
+### Подготовка подключения DTS к штатному медиатракту (только диагностика)
+
+Перед резервной копией и разработкой отдельного установщика для кухни нужен аудит каталога `/var`, фактического `EnvironmentFiles` службы `umediaserver`, существующих переменных загрузки плагинов, владельцев каталогов и возможных остатков DTS Restore. Префлайт не редактирует файлы и службы:
+
+```powershell
+ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/1c53eb1ea0f7c69c377a383a2680ecac1c7e4e91/tools/preflight-webos26-integration.sh -o /tmp/aleks-dts-preflight.sh && echo '39804c08eca95a444dc8189def1273db6c4acb5b338f4ab324c4ab7f22edf41d  /tmp/aleks-dts-preflight.sh' | sha256sum -c - && sh /tmp/aleks-dts-preflight.sh"
+```
+
+Даже `RESULT=PREFLIGHT_READY_FOR_BACKUP_AND_STAGED_TEST; NO_INSTALL` **не разрешает установку**: требуются резервная копия, отдельный установщик/откат, подтверждение сохранности `/var` после перезагрузки и тест штатного плеера. Текущий R278 всё ещё блокируется штатным установщиком по архитектуре ядра и устаревшей проверке AC3.
 
 ## Как установить
 
