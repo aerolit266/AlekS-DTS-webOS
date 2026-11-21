@@ -27,7 +27,7 @@ for f in /proc/[0-9]*/comm; do
     fi
   done
   case "$comm" in
-    umediaserver|starfish-media-*|*media*|*Media*|*gst*|*Gst*|WebAppMgr|WebOS*|com.webos.*) media=1 ;;
+    umediaserver|starfish-media-*|audiooutputd|*audio*|*Audio*|*media*|*Media*|*gst*|*Gst*|WebAppMgr|webappmanager|WAM|*Player*|*player*|WebOS*|com.webos.*) media=1 ;;
     *) media=0 ;;
   esac
   if [ "$mapped" -gt 0 ] || [ "$media" -eq 1 ]; then
@@ -62,6 +62,21 @@ if [ -f "$home/combined.reg" ] && [ -d "$home/plugins" ] &&
   done
 else
   printf 'PLUGIN_REGISTRY_CHECK=UNAVAILABLE\n'
+fi
+
+printf '%s\n' '=== STOCK CONTAINER DEMUXER FINGERPRINTS (READ ONLY) ==='
+for path in /usr/lib/gstreamer-1.0/libgstmatroska.so /usr/lib/gstreamer-1.0/libgstisomp4.so /mnt/lg/res/lglib/gstreamer-1.0/libgstmatroska.so; do
+  if [ -r "$path" ]; then
+    sha256sum "$path" || :
+  fi
+done
+printf '%s\n' '=== STOCK MATROSKA DTS CAPABILITY HINTS (READ ONLY) ==='
+if [ -x /usr/bin/gst-inspect-1.0 ]; then
+  env GST_PLUGIN_PATH_1_0="/usr/lib/gstreamer-1.0:/mnt/lg/res/lglib/gstreamer-1.0" \
+    GST_PLUGIN_SYSTEM_PATH_1_0="/usr/lib/gstreamer-1.0:/mnt/lg/res/lglib/gstreamer-1.0" \
+    GST_REGISTRY_1_0="/tmp/aleks-dts-diagnostic-registry-does-not-exist" GST_REGISTRY_UPDATE=no \
+    /usr/bin/gst-inspect-1.0 matroskademux 2>/dev/null \
+    | grep -Ei 'dts|audio/x-unknown|audio/x-dts' | head -n 8 || :
 fi
 
 printf '%s\n' '=== NATIVE SERVICE ERROR MARKERS (15m, counts only) ==='
