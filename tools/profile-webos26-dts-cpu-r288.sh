@@ -26,7 +26,7 @@ snap() {
   ticks=$(sed 's/^.*) //' "$f" 2>/dev/null | awk '{printf "%.0f",$12+$13}')
   [ -n "$ticks" ] || continue
   printf '%s %s\n' "$tid" "$ticks"
- done | sort -n
+ done | sort -k1,1
 }
 snap > "$tmp/before"
 before_count=$(wc -l < "$tmp/before")
@@ -41,6 +41,11 @@ join "$tmp/before" "$tmp/after" |
  awk '{d=$3-$2; if(d>=0) {printf "%s %.0f\n",$1,d;sum+=d;count++}} END {printf "TOTAL_TICKS %.0f\n",sum}' > "$tmp/diff"
 printf 'CLK_TCK=%s\n' "$(getconf CLK_TCK 2>/dev/null || echo UNKNOWN)"
 grep '^TOTAL_TICKS ' "$tmp/diff" || :
+if ! grep -q '^[0-9][0-9]* ' "$tmp/diff"; then
+  echo 'ERROR=NO_JOINED_THREAD_SAMPLES'
+  echo 'RESULT=R288_DIAGNOSTIC_FAILED; NO_CHANGES'
+  exit 1
+fi
 echo '=== TOP 10 MEDIA THREADS BY CPU TICKS IN 10s ==='
 grep -v '^TOTAL_TICKS ' "$tmp/diff" | sort -k2,2nr | head -n 10 |
 while read -r tid delta; do
