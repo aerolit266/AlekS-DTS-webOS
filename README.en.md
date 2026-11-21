@@ -31,6 +31,21 @@ Root SSH and an existing Homebrew setup are required. No system libraries or fir
 
 Test a DTS Core file in the native player first; your TV may already support it.
 
+## webOS 26 / ARM64: migration from DTS Restore
+
+**Do not install the ARMv7 R278 package on ARM64.** Keep the working DTS Restore installation until a separate ARM64 build passes isolated tests. The newer GStreamer ABI requires a rebuilt plugin set and native-player validation.
+
+A read-only preflight is available. It changes no files, services or mounts:
+
+```sh
+curl -fLsS --proto '=https' --proto-redir '=https' -o /tmp/aleks-dts-probe.sh \
+  'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/main/tools/probe-webos26.sh' &&
+printf '%s  %s\n' '2cb5b838ec0a89eed6b0a3003d75cb30e2f200d3a6003bf2aeefa90df8dc0742' /tmp/aleks-dts-probe.sh | sha256sum -c - &&
+sh /tmp/aleks-dts-probe.sh
+```
+
+Use the output to determine the actual ABI, DTS Restore footprint and umediaserver configuration. Migration then requires a backup, ARM64 build, isolated DTS/AC3 tests and separate native-player, Live TV and rollback validation. **No ARM64 installer has been released yet.**
+
 ## Installation
 
 Open root SSH on an LG ARMv7 TV and paste the full block. It downloads the pinned R278 archive with SHA-256 validation, replaces **only the fixed model/firmware and system-binary hash gate** in a temporary installer copy, and retains plugin integrity verification, media-pipeline tests, and rollback.
