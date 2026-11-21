@@ -88,6 +88,8 @@ ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubuse
 
 Even `RESULT=PREFLIGHT_READY_FOR_BACKUP_AND_STAGED_TEST; NO_INSTALL` is **not installation approval**. A backup, dedicated installer and rollback, `/var` persistence verification after reboot, and native-player testing are still required. The original R278 installer still rejects the kernel architecture and has an outdated AC3 assertion.
 
+**Kitchen LG storage inspection (2026-11-22):** `/` is read-only SquashFS (1.5 GB, 100% as expected for firmware image), `/var` and `/var/lib/webosbrew` are OverlayFS (720.8 MB total, 107.2 MB used, 561 MB available). Capacity is adequate but **persistence across a full reboot is unproven**: inspect `/proc/self/mountinfo` for the overlay `upperdir` and the underlying filesystem. Do not run `install` until verified.
+
 ### Kitchen LG dedicated installer (PREVIEW, no media service changes)
 
 For **LG 43NANO85A6A, firmware 43.22.74**, a dedicated frontend adapts the SHA256-pinned R278 archive. It verifies actual media ELF32 ARM, GStreamer 1.24.10, BusyBox timeout compatibility, DTS Core stereo/5.1, software AC3 and current `umediaserver` configuration. Original R278 environment-backup and rollback logic is retained.
