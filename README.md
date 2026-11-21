@@ -37,7 +37,7 @@ DTS Core 2.0 и 5.1 также прошли изолированные тест�
 
 На этом телевизоре `dtsdec`, `avdec_dca`, DTS-монтирования и стандартные каталоги DTS Restore не обнаружены; это ещё не доказывает полное отсутствие нестандартного DTS Restore или встроенного декодирования. Никаких изменений на телевизоре не выполнялось.
 
-**Полевой тест 22.11.2026:** изолированный тест R278 подтвердил ELF32 ARM (`umediaserver`, `gst-inspect`, GStreamer), GStreamer 1.24.10 и SHA256 архива, 4 плагинов и 3 тестовых файлов. **БЛОКИРОВАНО:** первый `gst-inspect` не смог загрузить `aleksdtsr130optin` (exit 1). DTS/AC3-декодирование и штатный плеер **не тестировались**, установка **не выполнялась**. Причину динамической загрузки нужно установить по stderr GStreamer; не обходить проверку.
+**Полевой тест 22.11.2026:** ELF32 ARM (`umediaserver`, `gst-inspect`, GStreamer), GStreamer 1.24.10 и SHA256 архива, 4 плагинов и 3 тестовых файлов — PASS. Первоначальный тест остановился **до загрузки плагина**: BusyBox 1.36.1 отклонил недопустимый параметр `timeout -t 20`. **Исправлено:** совместимый вызов `timeout 20`; требуется повторный тест на телевизоре. DTS/AC3 и штатный плеер **пока не проверены**, установка **не выполнялась**.
 
 **R278 не устанавливать:** текущий установщик использует проверку `uname -m = armv7l` и отклоняет телевизоры с 64-битным ядром, а совместимость бинарных плагинов R278 с GStreamer 1.24.10 не подтверждена. Проверки отключать нельзя. Перед заменой DTS Restore обязательны резервная копия, изолированные тесты и проверка штатного плеера.
 
@@ -59,7 +59,7 @@ sh /tmp/aleks-dts-probe.sh
 На TORMOZ в PowerShell (через действующий профиль webOS SDK):
 
 ```powershell
-ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/main/tools/verify-r278-webos26.sh -o /tmp/aleks-dts-verify.sh && echo '279f8f566d16fb4eab70bb9bd3738650ec986e47aeacd55dca2eb9c26c05f193  /tmp/aleks-dts-verify.sh' | sha256sum -c - && sh /tmp/aleks-dts-verify.sh"
+ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/main/tools/verify-r278-webos26.sh -o /tmp/aleks-dts-verify.sh && echo '6e8dd4f813ca154b31ba96d8113b2c64a34e089dbdca11772858d6e5a7613f81  /tmp/aleks-dts-verify.sh' | sha256sum -c - && sh /tmp/aleks-dts-verify.sh"
 ```
 
 Если вывод содержит `PASS ISOLATED R278 ON GSTREAMER 1.24 (NO INSTALL)`, результат означает успешные тесты в отдельном процессе, **не** готовую установку в медиатракт LG. При ошибке скрипт останавливается и показывает фрагмент диагностики; ничего не подключает автоматически.
