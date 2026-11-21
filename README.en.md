@@ -43,16 +43,16 @@ Open root SSH on an LG ARMv7 TV and paste the full block. It downloads the pinne
   curl -fLsS --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 60 \
     -o "$stage/install-universal.sh" \
     'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/main/install-universal.sh'
-  printf '%s  %s\n' 'fa674ae01a879f96c10652592c3da987640c34efa2b50a0119133acb7f3ffb3f' "$stage/install-universal.sh" | sha256sum -c -
+  printf '%s  %s\n' '9c3ce62eeadcd638968a72bd29b3aefbbe349425c0ef739c455ab50c61de3a48' "$stage/install-universal.sh" | sha256sum -c -
   sh "$stage/install-universal.sh" install
 )
 ```
 
-**Media configuration compatibility:** the installer detects `umediaserver.env` from the actual `EnvironmentFiles` entry of `umediaserver.service`, instead of assuming the path from a single LG model. A missing directory is created only when that path is declared by the service and its root-owned parent exists. Other service layouts are not modified automatically. To diagnose, download the script and run `sh /tmp/aleks-dts-universal.sh diagnose`.
+**Media configuration compatibility:** the installer detects `umediaserver.env` from the actual `EnvironmentFiles` entry of `umediaserver.service`, instead of assuming the path from a single LG model. For a declared `/var/systemd/system/env/umediaserver.env` path, it creates missing `/var/systemd`, `/var/systemd/system` and `/var/systemd/system/env` directories after root ownership and symlink checks; empty directories created by a failed run are cleaned up. Other service layouts are not modified automatically. To diagnose, download the script and run `sh /tmp/aleks-dts-universal.sh diagnose`.
 
 **Verify without installing:** change the last `install` argument to `verify`. The isolated decoding tests do not modify the media-service configuration. On an untested model, run `verify` first.
 
-After `R278 configured`, fully reboot and test DTS Core, AC3, and Live TV.
+After `R278 configured`, fully reboot and test DTS Core, AC3, and Live TV. Confirm `/var/systemd/system/env/umediaserver.env` still exists after reboot; persistence of `/var` has not yet been verified on other models.
 
 **Rollback** from root SSH if playback or the native media service misbehaves:
 
