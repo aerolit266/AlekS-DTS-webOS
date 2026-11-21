@@ -50,6 +50,18 @@ sh /tmp/aleks-dts-probe.sh
 
 Use the output to determine the actual ABI, DTS Restore footprint and umediaserver configuration. Migration then requires a backup, a build for the **actual 32-bit media ABI/GStreamer 1.24.10**, isolated DTS/AC3 tests, and native-player, Live TV and rollback validation. **No webOS 26 installer has been released yet.**
 
+### Safe R278 verification on GStreamer 1.24 (no installation)
+
+The LG 43NANO85A6A can run an **isolated** compatibility test of all four existing ARM32 plugins and three bundled audio fixtures. It verifies SHA256 and ELF32 ARM, uses a temporary GStreamer registry under \`/tmp\`, and checks DTS 2.0, DTS 5.1 and AC3. It **never** edits \`umediaserver.env\`, system files, mounts or services.
+
+From TORMOZ PowerShell, using the already configured webOS SDK profile:
+
+\`\`\`powershell
+ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/main/tools/verify-r278-webos26.sh -o /tmp/aleks-dts-verify.sh && echo '279f8f566d16fb4eab70bb9bd3738650ec986e47aeacd55dca2eb9c26c05f193  /tmp/aleks-dts-verify.sh' | sha256sum -c - && sh /tmp/aleks-dts-verify.sh"
+\`\`\`
+
+A \`PASS ISOLATED R278 ON GSTREAMER 1.24 (NO INSTALL)\` result demonstrates only separate-process fixture compatibility, **not** native-player functionality. Failures stop without enabling plugins and include a short diagnostic log excerpt.
+
 ## Installation
 
 Open root SSH on an LG ARMv7 TV and paste the full block. It downloads the pinned R278 archive with SHA-256 validation, replaces **only the fixed model/firmware and system-binary hash gate** in a temporary installer copy, and retains plugin integrity verification, media-pipeline tests, and rollback.
