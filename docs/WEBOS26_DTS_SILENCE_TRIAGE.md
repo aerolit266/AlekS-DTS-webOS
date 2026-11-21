@@ -69,3 +69,19 @@ Logs report exit, `AlekSDts16DecBin` instantiation, EOS, and 6-channel PCM negot
 **Decision gate:** only if (2) reproduces the failed decoder selection and (3) restores 6-channel PCM may a reversible native service environment override be considered. Still require a real audio sink / Lampa sound test and AC3/DVB regression; never infer production success from `fakesink`.
 
 **Status:** R281 script GitHub commit `def783e5`; VPS shell syntax PASS, SHA256 `b75fe27330827db37a17c143796313347e72a8f8aa37c582bef0255d551a84d2`; NOT YET TESTED ON KITCHEN.
+
+## R281 real field result — 2026-11-22
+
+User executed R281 on the kitchen LG. **All installed R278 integrity checks passed.** GStreamer 1.24.10 confirmed, `/etc/gst/gstcool.conf` contains `decproxy=300`. Temporary per-process rank overrides were confirmed effective: `aleksdts16dec=288,decproxy=0`, `aleksdts16dec=288,decproxy=300`, `aleksdts16dec=350,decproxy=300`.
+
+For all three **ordinary `decodebin ! fakesink`** cases: **exit 0, AlekSDts16DecBin instantiated, EOS yes, PCM six-channel yes**. Therefore **rank 300 vs 288 does NOT reproduce silent audio in this isolated decodebin test**, and a rank-only production fix is **not justified**.
+
+This test does not model LG's complete native media-resource negotiation. It also does not cover `decodebin3`, `decproxy` resource-grant events, real output sinks, or actual feature/movie DTS track specifics. Never claim that it disproves every possible native rank conflict.
+
+### Next experiment R282 (staged, read-only for production)
+
+Created [`tools/test-webos26-decodebin3-pcm-r282.sh`](../tools/test-webos26-decodebin3-pcm-r282.sh), commit `993083a`, tested shell syntax on VPS, SHA256 `447ffe1802cb7cdf945a705b0c72ed7ac52629c0c93b11bb72a1a235e2d1d6b0`. Its `gst-launch` tests use **`decodebin3`**, not `decodebin`, under 288/0, 288/300 and 350/300 rank configurations. A fourth test adds `audioconvert ! audio/x-raw,format=S32LE,channels=2` and `fakesink`, while querying discovered sink factory caps. It touches only an isolated /tmp registry/fixture and **never sends sound to physical outputs**. It is **NOT YET RUN ON LG**.
+
+Decision points: if `decodebin3` differs by rank then investigate resource handling; if all decodebin3 tests work, rank changes are lower priority, investigate real player stream caps and hardware/native sound sink. Successful S32LE/stereo negotiation with `fakesink` is **not proof** that the physical sink accepts or reproduces it.
+
+**Safety:** no replacement or mutation of stock `libgstmatroska.so`, `libgsttsinkbin.so`, `/etc/gst/gstcool.conf`, `umediaserver.env` or LG system partitions; no reboot or service restart. DTS playback still **FAIL** until real audio test passes.
