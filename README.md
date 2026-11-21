@@ -59,8 +59,10 @@ sh /tmp/aleks-dts-probe.sh
 На TORMOZ в PowerShell (через действующий профиль webOS SDK):
 
 ```powershell
-ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/main/tools/verify-r278-webos26.sh -o /tmp/aleks-dts-verify.sh && echo '6e8dd4f813ca154b31ba96d8113b2c64a34e089dbdca11772858d6e5a7613f81  /tmp/aleks-dts-verify.sh' | sha256sum -c - && sh /tmp/aleks-dts-verify.sh"
+ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/d0554defd64bd2831a2bc06e7edc65a1370e7b36/tools/verify-r278-webos26.sh -o /tmp/aleks-dts-verify.sh && echo '6e8dd4f813ca154b31ba96d8113b2c64a34e089dbdca11772858d6e5a7613f81  /tmp/aleks-dts-verify.sh' | sha256sum -c - && sh /tmp/aleks-dts-verify.sh"
 ```
+
+**Почему указан SHA коммита, а не `main`:** 22.11.2026 GitHub raw CDN отдавал устаревшую версию скрипта из `main` с SHA256 `279f8f...`, хотя файл в репозитории уже был исправлен. Загрузка по фиксированному коммиту `d0554def...` проверена с SHA256 `6e8dd4f8...`. При несовпадении SHA256 скрипт не запускайте.
 
 Если вывод содержит `PASS ISOLATED R278 ON GSTREAMER 1.24 (NO INSTALL)`, результат означает успешные тесты в отдельном процессе, **не** готовую установку в медиатракт LG. При ошибке скрипт останавливается и показывает фрагмент диагностики; ничего не подключает автоматически.
 
