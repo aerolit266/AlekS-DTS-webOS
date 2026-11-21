@@ -98,7 +98,7 @@ For **LG 43NANO85A6A, firmware 43.22.74**, a dedicated frontend adapts the SHA25
 ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/0c9e34e7c54d3230fda1816ff4bba42c6edbcbe3/tools/install-webos26-preview.sh -o /tmp/aleks-dts-webos26-preview.sh && echo 'bb1401495a1d6950cb7b2026b9ff3a9dc9c7ca166b1f213e67d03aaa45f60b8d  /tmp/aleks-dts-webos26-preview.sh' | sha256sum -c - && sh /tmp/aleks-dts-webos26-preview.sh verify"
 ```
 
-Success: `RESULT=VERIFIED_ISOLATED_NO_INSTALL`. Offline patch assembly already passed `PATCH_ONLY_PASS`, `SYNTAX_PASS` and SHA256 checks on VPS. **The actual installation mode has not yet been tested on the kitchen TV**. Rollback, `/var` persistence after reboot and explicit owner authorization to modify `umediaserver.env` remain required. Do not use the old `install-universal.sh` on this TV.
+Success: `RESULT=VERIFIED_ISOLATED_NO_INSTALL`. **Kitchen LG 43NANO85A6A field verification PASS (2026-11-22):** `PATCH_PASS`, SHA256 of all four plugins and three fixtures, `PASS dts-stereo`, `PASS dts-51`, `PASS ac3-software-augmented`, `RESULT=VERIFIED_ISOLATED_NO_INSTALL`. Actual `install` and rollback have not been tested on the kitchen TV. Rollback, `/var` persistence after reboot and explicit owner authorization to modify `umediaserver.env` remain required. Do not use the old `install-universal.sh` on this TV.
 
 ## Installation
 
