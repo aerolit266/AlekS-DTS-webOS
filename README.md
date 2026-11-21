@@ -2,7 +2,7 @@
 
 [English](README.en.md) · [Лицензия документации](LICENSE.md)
 
-> **R278 доступен для установки** на LG 65NANO896PC с прошивкой 03.60.96. [Команда установки](#как-установить)
+> **R278: универсальный установщик для совместимых LG ARMv7.** Привязки к модели, номеру прошивки и SDK больше нет. Перед изменением медиасервиса выполняются проверки библиотек, DTS и AC3. [Установка](#как-установить)
 
 **AlekS DTS R277** добавляет декодирование DTS Core в штатный медиатракт LG webOS. При обычном включении телевизора поддержка загружается автоматически. Для проверенной дорожки DTS 5.1 медиаплеер получил PCM S16LE, 48 кГц, 6 каналов.
 
@@ -17,41 +17,52 @@
 
 DTS Core 2.0 и 5.1 также прошли изолированные тесты. Для DTS-HD MA, DTS:X, передачи DTS на ресивер и других моделей LG нужна отдельная проверка.
 
-## Совместимость R277
+## Совместимость и ограничения
 
 | Модель или платформа | Статус |
 | --- | --- |
-| LG 65NANO896PC · прошивка 03.60.96 · webOS TV 6.6.0 · ARMv7 · GStreamer 1.16.2 | Проверено на телевизоре с root-доступом и уже установленным R56 |
-| Другие LG на webOS TV 6.x, ARMv7 | Кандидаты на проверку. Нужно сверить модель, прошивку, ABI GStreamer и работу штатного медиаплеера и Live TV |
-| webOS TV 5.x и линейки webOS TV 22–26 | R277 на этих версиях не проверен. Для ARM64 требуется отдельная сборка и испытания штатного медиатракта |
+| LG 65NANO896PC · 03.60.96 · webOS TV 6.6.0 · ARMv7 · GStreamer 1.16.2 | Работа DTS Core 5.1 проверена на реальном телевизоре |
+| Другие LG на ARMv7 с нативным umediaserver / GStreamer | Модель и прошивка не блокируются. Перед включением проводится изолированный тест DTS 2.0, DTS 5.1 и AC3. Результат реального воспроизведения ещё нужно проверить |
+| LG на ARM64 / другие архитектуры | Не поддерживаются бинарными плагинами R278: нужна отдельная сборка |
+| Несовместимый медиатракт, ABI, изменённая конфигурация | Установка должна остановиться до переключения конфигурации медиасервиса |
 
-Перед установкой воспроизведите в штатном плеере локальный MKV с известной дорожкой DTS Core. Если звук уже есть, для этой дорожки установка не нужна. По одному номеру webOS нельзя определить поддержку DTS и совместимость R277. [Спецификации LG webOS TV](https://webostv.developer.lge.com/develop/specifications)
+Требуется root SSH и существующая Homebrew-конфигурация. Установщик не заменяет системные библиотеки или прошивку. Автоматическое прохождение тестов GStreamer ещё не гарантирует звук в штатном плеере каждой модели.
+
+Перед установкой проверьте, что телевизор ещё не воспроизводит нужную DTS Core дорожку самостоятельно.
 
 ## Как установить
 
-На **LG 65NANO896PC с прошивкой 03.60.96 и webOS TV 6.6.0** заранее настройте root SSH и Homebrew. Откройте SSH-сеанс на телевизоре и вставьте весь блок. После сообщения `R278 configured` полностью перезагрузите ТВ.
+Откройте root SSH на телевизоре LG с ARMv7 и вставьте блок целиком. Он скачивает проверенную по SHA-256 оригинальную сборку R278, удаляет из временной копии установщика **только фиксированную проверку модели/прошивки и хешей системных бинарников**, сохраняя хеш-проверки плагинов, проверки медиатракта и откат.
 
 ```sh
 (
   set -eu
-  [ "$(id -u)" = 0 ] || { echo 'Root SSH is required.' >&2; exit 1; }
-  [ "$(uname -m)" = armv7l ] || { echo 'This release requires ARMv7.' >&2; exit 1; }
-  stage=$(mktemp -d /tmp/aleks-dts-download.XXXXXX)
+  [ "$(id -u)" = 0 ] || { echo 'Root SSH required.' >&2; exit 1; }
+  stage=$(mktemp -d /tmp/aleks-dts-bootstrap.XXXXXX)
   trap 'rm -rf -- "$stage"' EXIT
-  cd "$stage"
-  curl -fLsS --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 120 \
-    -o release.tar.gz 'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/r278/downloads/r278/AlekS-DTS-R278-65NANO896PC-03.60.96.tar.gz'
-  printf '%s  %s\n' 'cafb3e014f407a4a0dda6bd50a0e4f983aa0b35ea1f53e705f504aed0a094ea1' release.tar.gz | sha256sum -c -
-  tar -xmzf release.tar.gz
-  sh ./install.sh install
+  curl -fLsS --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 60 \
+    -o "$stage/install-universal.sh" \
+    'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/main/install-universal.sh'
+  printf '%s  %s\n' 'c499c9266d175301b48574dbef604b59b40b8d4ba529808fcac6bb1ea4bdbab2' "$stage/install-universal.sh" | sha256sum -c -
+  sh "$stage/install-universal.sh" install
 )
 ```
 
-Для отката выполните `sh /var/lib/webosbrew/aleks-dts-r278/install.sh rollback` и полностью перезагрузите ТВ.
+**Проверка без установки:** в последней строке замените `install` на `verify`. Проверка выполняет изолированные тесты декодирования, но не меняет конфигурацию медиасервиса. Для другой модели рекомендуется сначала `verify`.
 
-[Установочный архив](https://github.com/aerolit266/AlekS-DTS-webOS/blob/r278/downloads/r278/AlekS-DTS-R278-65NANO896PC-03.60.96.tar.gz) · [SHA‑256](https://github.com/aerolit266/AlekS-DTS-webOS/blob/r278/downloads/r278/SHA256SUMS) · [Лицензии ПО](https://github.com/aerolit266/AlekS-DTS-webOS/blob/r278/downloads/r278/SOFTWARE-NOTICES.txt) · [libdcadec и перелинковка](https://github.com/aerolit266/AlekS-DTS-webOS/blob/r278/downloads/r278/R278-R56-LGPL-RELINK.tar.gz)
+После сообщения `R278 configured` полностью перезагрузите ТВ. Проверьте DTS Core и обычный AC3, а также телевещание.
 
-Оригинальный установщик проверен на чистой конфигурации медиасервера. Очищенные плагины из публичного комплекта прошли изолированные тесты DTS 2.0, DTS 5.1 и AC3 на том же LG. Если модель или прошивка отличаются, укажите их в [запросе совместимости](https://github.com/aerolit266/AlekS-DTS-webOS/issues/new).
+**Откат:** при сбое выполните через root SSH:
+
+```sh
+sh /var/lib/webosbrew/aleks-dts-r278/install.sh rollback
+```
+
+После `Rollback verified` полностью перезагрузите телевизор. Оригинальная конфигурация медиасервиса восстанавливается из резервной копии; если её изменили сторонние компоненты, установщик откажется перезаписывать изменения.
+
+[Универсальный установщик](install-universal.sh) · [Исходный архив R278](https://github.com/aerolit266/AlekS-DTS-webOS/blob/r278/downloads/r278/AlekS-DTS-R278-65NANO896PC-03.60.96.tar.gz) · [SHA-256 архива](https://github.com/aerolit266/AlekS-DTS-webOS/blob/r278/downloads/r278/SHA256SUMS) · [Исходники и лицензии](https://github.com/aerolit266/AlekS-DTS-webOS/blob/r278/downloads/r278/SOFTWARE-NOTICES.txt)
+
+Если установка останавливается на ABI/GStreamer, не отключайте эти проверки. Сообщите [модель, архитектуру и версию GStreamer](https://github.com/aerolit266/AlekS-DTS-webOS/issues/new) — для ARM64 или другого ABI потребуется отдельный бинарный пакет.
 
 
 © 2026 AlekS / GameFree24 (@aerolit266). [Условия использования документации](LICENSE.md).
