@@ -16,6 +16,7 @@ FILES = ("legacy-log", "legacy-log.0.gz", "legacy-log.1.gz",
          "legacy-log.2.gz", "legacy-log.3.gz", "legacy-log.4.gz")
 UTC = re.compile(rb"^2026-11-22T(16:\d\d:\d\d)(?:\.\d+)?Z")
 PORT = re.compile(rb"audio-port=\(int\)(\d{1,2})")
+COLD_START = "16:18:45"
 BEFORE = "16:20:14"
 AFTER = "16:24:28"
 MAX_BYTES = 6000000
@@ -51,6 +52,8 @@ def classify(raw: bytes) -> tuple:
 def run() -> dict:
     counts=Counter()
     timeline=[]
+    cold_counts=Counter()
+    cold_timeline=[]
     files_seen={}
     for filename in FILES:
         file=ROOT / filename
@@ -69,26 +72,34 @@ def run() -> dict:
                     if not match:
                         continue
                     stamp=match.group(1).decode("ascii")
-                    if not BEFORE<stamp<=AFTER:
+                    if not COLD_START<=stamp<=AFTER:
                         continue
                     kinds=classify(raw)
                     if not kinds:
                         continue
                     included+=1
-                    counts.update(kinds)
                     p=PORT.search(raw)
                     event={"utc":stamp,"event":list(kinds)}
                     if p: event["audio_port"]=int(p.group(1))
-                    if len(timeline)<500: timeline.append(event)
+                    if stamp<=BEFORE:
+                        cold_counts.update(kinds)
+                        if len(cold_timeline)<500: cold_timeline.append(event)
+                    else:
+                        counts.update(kinds)
+                        if len(timeline)<500: timeline.append(event)
         except (OSError,EOFError,gzip.BadGzipFile):
             files_seen[filename]="READ_ERROR"
             continue
         files_seen[filename]=included
     timeline.sort(key=lambda ev:ev["utc"])
+    cold_timeline.sort(key=lambda ev:ev["utc"])
     return {
       "schema":"aleks-dts-r335-transition-diff-v1",
       "before_snapshot_utc":BEFORE,
       "recovered_snapshot_utc":AFTER,
+      "cold_before_first_snapshot_from_utc":COLD_START,
+      "cold_counts":dict(cold_counts),
+      "cold_events":cold_timeline[-MAX_EVENTS:],
       "counts":dict(counts),
       "last_events":timeline[-MAX_EVENTS:],
       "source_file_event_counts":files_seen,
