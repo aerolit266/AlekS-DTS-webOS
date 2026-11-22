@@ -28,7 +28,6 @@ CLUES={
     "FAILED":rb"fail(?:ed|ure)?",
     "PERMISSION":rb"permission.denied|access.denied|not.authorized",
     "OOM":rb"out.of.memory|ENOMEM|no.memory",
-    "GENERAL_ERROR":rb"\berror\b|\berr\b",
 }
 COMPILED={key:re.compile(pattern,re.I) for key,pattern in CLUES.items()}
 MAX_BYTES=6000000
