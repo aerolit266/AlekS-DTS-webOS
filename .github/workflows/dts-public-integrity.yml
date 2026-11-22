@@ -31,3 +31,7 @@ jobs:
         run: python3 tools/audit-public-github-r322.py
       - name: Validate exact released libdcadec DTS packet cardinality
         run: sh tools/run-r324-libdcadec-packet-cardinality.sh
+      - name: Validate privacy-preserving R326 PulseAudio/ALSA parsers and PCM energy math
+        run: |
+          python3 tools/r326-passive-pulseaudio-alsa-snapshot.py selftest
+          python3 tools/r326-pulse-monitor-energy.py selftest
