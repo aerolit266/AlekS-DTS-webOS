@@ -78,6 +78,7 @@ static pthread_once_t resolve_once=PTHREAD_ONCE_INIT;
 static pthread_mutex_t mu=PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t io_mu=PTHREAD_MUTEX_INITIALIZER;
 static atomic_int enabled=ATOMIC_VAR_INIT(0);
+static atomic_ulong last_dts_sec=ATOMIC_VAR_INIT(0);
 static unsigned long started_at=0;
 static int qa_mode=0;
 static char output_path[192];
@@ -85,6 +86,7 @@ static struct {
   uint64_t input_buffers, be16_sync, missing_pts;
   uint64_t event_start,event_caps,event_time,event_bytes;
   uint64_t pcm_buffers, pcm_samples, pcm_nonzero, bad_maps, ignored_pcm;
+  uint64_t pcm_wrapper_buffers, pcm_converter_buffers;
   uint64_t clipped, s16_buffers, s32_buffers, f32_buffers;
   double squared, peak;
   int pcm_channels, pcm_rate;
@@ -144,6 +146,16 @@ static int owned_by_decoder(GstPad *pad) {
   a.object_unref(elem);
   return match;
 }
+static int owned_by_audioconvert(GstPad *pad) {
+  if(!pad || !a.available)return 0;
+  GstElement *element=a.get_parent(pad);
+  if(!element)return 0;
+  GstElementFactory *factory=a.get_factory(element);
+  const gchar *name=factory?GST_OBJECT_NAME(factory):NULL;
+  int yes=name && !strcmp(name,"audioconvert");
+  a.object_unref(element);
+  return yes;
+}
 static int peer_is_decoder(GstPad *pad) {
   if(!pad) return 0;
   GstPad *peer=a.get_peer(pad);
@@ -163,13 +175,14 @@ static void record_input(GstBuffer *buffer) {
                  m.data[2]==0x80 && m.data[3]==0x01;
   const int no_pts=!GST_BUFFER_PTS_IS_VALID(buffer);
   a.buffer_unmap(buffer,&m);
+  atomic_store_explicit(&last_dts_sec,mono_seconds(),memory_order_relaxed);
   pthread_mutex_lock(&mu);
   stats.input_buffers++;
   stats.be16_sync+=sync;
   stats.missing_pts+=no_pts;
   pthread_mutex_unlock(&mu);
 }
-static void record_pcm(GstPad *pad,GstBuffer *buffer) {
+static void record_pcm(GstPad *pad,GstBuffer *buffer,int from_converter) {
   if(!pad || !buffer) return;
   GstCaps *caps=a.current_caps(pad);
   if(!caps) return;
@@ -232,6 +245,8 @@ static void record_pcm(GstPad *pad,GstBuffer *buffer) {
   pthread_mutex_lock(&mu);
   if(stats.pcm_samples < MAX_PCM_TOTAL) {
     stats.pcm_buffers++;
+    stats.pcm_wrapper_buffers+=from_converter==0;
+    stats.pcm_converter_buffers+=from_converter!=0;
     stats.pcm_samples+=n;
     stats.pcm_nonzero+=nz;
     stats.clipped+=clip;
@@ -275,6 +290,7 @@ static void save_snapshot(unsigned elapsed) {
     "\"event_bytes\":%llu,\"pcm_buffers\":%llu,\"pcm_sampled\":%llu,"
     "\"pcm_nonzero\":%llu,\"pcm_rms_dbfs\":%.2f,\"pcm_peak_dbfs\":%.2f,"
     "\"pcm_channels\":%d,\"pcm_rate\":%d,"
+    "\"pcm_wrapper_buffers\":%llu,\"pcm_converter_buffers\":%llu,"
     "\"format_s16_buffers\":%llu,\"format_s32_buffers\":%llu,"
     "\"format_f32_buffers\":%llu,\"bad_maps\":%llu,"
     "\"ignored_pcm\":%llu,\"clipped\":%llu,"
@@ -291,6 +307,8 @@ static void save_snapshot(unsigned elapsed) {
     (unsigned long long)stats.pcm_samples,
     (unsigned long long)stats.pcm_nonzero,rms,peak,
     stats.pcm_channels,stats.pcm_rate,
+    (unsigned long long)stats.pcm_wrapper_buffers,
+    (unsigned long long)stats.pcm_converter_buffers,
     (unsigned long long)stats.s16_buffers,
     (unsigned long long)stats.s32_buffers,
     (unsigned long long)stats.f32_buffers,
@@ -366,7 +384,19 @@ GstFlowReturn gst_pad_push(GstPad *pad,GstBuffer *buffer) {
   if(!a.push)return GST_FLOW_ERROR;
   if(a.available && active()) {
     if(peer_is_decoder(pad))record_input(buffer);
-    if(owned_by_decoder(pad))record_pcm(pad,buffer);
+    if(owned_by_decoder(pad))record_pcm(pad,buffer,0);
+    else if(owned_by_audioconvert(pad)) {
+      /* Heuristic fallback only: vendor bin ghost-src push may bypass PLT.
+         Require an actual decoder input within the last 5 seconds; label
+         such PCM as converter-associated, not certified decoder output. */
+      unsigned long last=atomic_load_explicit(&last_dts_sec,memory_order_relaxed);
+      if(last && mono_seconds()-last<=5) {
+        pthread_mutex_lock(&mu);
+        int direct=stats.pcm_wrapper_buffers>0;
+        pthread_mutex_unlock(&mu);
+        if(!direct)record_pcm(pad,buffer,1);
+      }
+    }
   }
   return a.push(pad,buffer);
 }
