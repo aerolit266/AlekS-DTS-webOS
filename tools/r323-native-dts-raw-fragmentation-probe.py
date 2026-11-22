@@ -78,6 +78,19 @@ def test_decoder(name, source_args, env):
     print("R323_" + name + "_ACTIVE_WINDOWS=" + str(active))
     print("R323_" + name + "_CUSTOM_DECODER=" +
           ("yes" if detected_decoder else "not_seen"))
+    low=output.lower()
+    # Error class only: no arbitrary media/service logs.
+    tags = [tag for tag,part in (
+        ("NOT_NEGOTIATED","not-negotiated"),
+        ("NOT_LINKED","not-linked"),
+        ("FLOW_ERROR","reason error"),
+        ("INTERNAL_STREAM_ERROR","internal data stream error"),
+        ("DECODE_ERROR","decoding error"),
+        ("NO_VALID_FRAME","no valid frames"),
+        ("MISSING_PLUGIN","missing plugin"),
+        ("ERROR_MESSAGE","error: from element"),
+    ) if part in low]
+    print("R323_" + name + "_DIAG_TAGS=" + (",".join(tags) or "NONE"))
     if levels:
         print("R323_" + name + "_MAX_RMS_DBFS=" + "%.2f" % max(levels))
     # No raw logs/filenames or PCM: only allowlisted scalars.
@@ -141,6 +154,15 @@ def main():
             src = ["filesrc", "blocksize=" + str(block),
                    "location=" + str(raw), "!", "audio/x-dts"]
             test_decoder("RAW_" + str(block), src, env)
+        # For the exact 1024-byte frame, vary upstream CAPS only.
+        # Distinguishes missing initial stream metadata from fragmentation.
+        for suffix, caps in (
+            ("RATE_CH", "audio/x-dts,channels=2,rate=48000"),
+            ("FRAMED", "audio/x-dts,channels=2,rate=48000,framed=(boolean)true"),
+        ):
+            src = ["filesrc", "blocksize=1024",
+                   "location=" + str(raw), "!", caps]
+            test_decoder("RAW_1024_" + suffix, src, env)
     print("R323_PRODUCTION_SERVICE_MODIFIED=NO")
     print("R323_LIVE_LAMPA_PCM=UNOBSERVED")
     print("RESULT=R323_NATIVE_RAW_DTS_FRAGMENTATION_DIFFERENTIAL_COMPLETE")
