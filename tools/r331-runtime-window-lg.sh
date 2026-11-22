@@ -97,9 +97,14 @@ arm() {
     systemctl daemon-reload || :
     die RELOAD_FAILED
   fi
-  case "$(systemctl show umediaserver.service -p EnvironmentFiles --value)" in
-    *'/var/systemd/system/env/umediaserver.env'*'/run/aleks-r331/observer.env'*) : ;;
-    *) rm -f "$DROP";systemctl daemon-reload || :;die OVERLAY_NOT_REGISTERED ;;
+  files=$(systemctl show umediaserver.service -p EnvironmentFiles --value)
+  case "$files" in
+    *'/var/systemd/system/env/umediaserver.env'*) : ;;
+    *) rm -f "$DROP";systemctl daemon-reload || :;die ORIGINAL_ENV_NOT_REGISTERED ;;
+  esac
+  case "$files" in
+    *'/run/aleks-r331/observer.env'*) : ;;
+    *) rm -f "$DROP";systemctl daemon-reload || :;die OVERLAY_ENV_NOT_REGISTERED ;;
   esac
   # The watchdog is owned by systemd PID1, independent of the SSH/MCP session.
   if ! systemd-run --unit=aleks-r331-rollback --on-active=100s /bin/sh "$ROOT/controller.sh" rollback; then
@@ -115,7 +120,7 @@ arm() {
   [ "$(systemctl is-active umediaserver.service)" = active ] ||
     { /bin/sh "$ROOT/controller.sh" rollback || :;die MEDIA_NOT_ACTIVE; }
   pid=$(systemctl show umediaserver.service -p MainPID --value)
-  python3 - "$pid" <<'PY'
+  if python3 - "$pid" <<'PY'
 from pathlib import Path
 import sys
 env=(Path('/proc')/sys.argv[1]/'environ').read_bytes().split(b'\x00')
@@ -126,7 +131,12 @@ assert b'libsystrim.so.3' in preloads[0]
 assert b'/run/aleks-r331/libaleksr331hook.so' in preloads[0]
 print('R331_UMEDIASERVER_PRELOAD_ACTIVE=YES')
 PY
-  echo RESULT=R331_LIVE_WINDOW_ARMED_AUTO_ROLLBACK
+  then
+    echo RESULT=R331_LIVE_WINDOW_ARMED_AUTO_ROLLBACK
+  else
+    /bin/sh "$ROOT/controller.sh" rollback || :
+    die PRELOAD_NOT_APPLIED_AND_ROLLBACK_ATTEMPTED
+  fi
 }
 rollback() {
   [ "$(id -u)" = 0 ] || die ROLLBACK_NOT_ROOT
