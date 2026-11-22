@@ -193,6 +193,7 @@ RESULT=R295_POLICY_QUERY_COMPLETED_NO_DEVICE_CHANGES
 RESULT=R295_POLICY_QUERY_COMPLETED_NO_DEVICE_CHANGES
 """)
     assert mixed_resources["route_source"] is None and mixed_resources["muted"] is None
+    assert "umi_active" not in mixed_resources and "stream_active" not in mixed_resources
     # No synthetic first-start failure may be mislabeled as the witnessed one.
     from_idle = compare(idle, healthy, "unknown", "yes")
     assert any("not verified as a DTS-loaded" in s for s in from_idle["assessment"])
