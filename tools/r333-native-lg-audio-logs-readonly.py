@@ -124,10 +124,31 @@ def scan() -> dict:
 
 
 def main() -> int:
-    if len(sys.argv) != 2 or sys.argv[1] != "snapshot":
+    if len(sys.argv) != 2 or sys.argv[1] not in ("snapshot", "compact"):
         print("RESULT=R333_NATIVE_LOG_USAGE")
         return 2
-    print("R333_NATIVE_LOG_JSON=" + json.dumps(scan(), sort_keys=True, separators=(",", ":")))
+    data = scan()
+    if sys.argv[1] == "compact":
+        keep = ("DTS_CODEC", "DTS_SEAMLESS_FLAG", "AC3", "DECODER", "RESOURCE",
+                "DSP", "WARN_OR_ERROR_LEVEL")
+        slim = {
+            "schema": data["schema"],
+            "windows": {key: {tag: counters.get(tag, 0) for tag in keep}
+                        for key, counters in data["window_tag_counts"].items()},
+            "codec_minutes": {
+                minute: {tag: totals.get(tag, 0) for tag in keep}
+                for minute, totals in data["minute_tag_counts"].items()
+                if "15:40" <= minute <= "15:54"
+            },
+            "sample_events": data["strong_event_time_and_tags"][:14],
+            "no_raw_logs_exported": True,
+            "service_modified": False,
+        }
+        print("R333_NATIVE_LOG_COMPACT_JSON=" +
+              json.dumps(slim, sort_keys=True, separators=(",", ":")))
+    else:
+        print("R333_NATIVE_LOG_JSON=" +
+              json.dumps(data, sort_keys=True, separators=(",", ":")))
     print("RESULT=R333_NATIVE_LOG_READONLY_SUMMARY_PASS")
     return 0
 
