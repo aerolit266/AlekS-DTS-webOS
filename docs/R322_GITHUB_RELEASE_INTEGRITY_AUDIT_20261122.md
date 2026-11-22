@@ -42,12 +42,12 @@ R322_MODEL_BOUND_ORIGINAL_AND_ROLLBACK=PASS
 R322_SHELL_SYNTAX_PASS=41
 R322_PYTHON_SYNTAX_PASS=13
 R322_UNIVERSAL_INSTALLER_SHA_AND_GATES=PASS
-R322_DOCUMENT_RELATIVE_LINKS_PASS=187
+R322_DOCUMENT_RELATIVE_LINKS_PASS=192
 R322_REPRODUCIBLE_BOOTSTRAP_AND_FIELD_STATUS=PASS
 RESULT=R322_PUBLIC_GITHUB_AUDIT_PASS
 ```
 
-- GitHub Actions read-only CI [workflow](../.github/workflows/dts-public-integrity.yml) added for pushes and PRs. Uses pinned GitHub-owned checkout action SHA, read-only `contents: read` and runs the same no-network Python audit. YAML syntax validated on VPS with PyYAML, 2 steps. Initially observed on GitHub as `in_progress`; a successful Actions result requires later confirmation and must not be conflated with the confirmed VPS audit.
+- GitHub Actions read-only CI [workflow](../.github/workflows/dts-public-integrity.yml) added for pushes and PRs. Uses pinned GitHub-owned checkout action SHA, read-only `contents: read` and runs the same no-network Python audit. YAML syntax validated on VPS with PyYAML, 2 steps. **Confirmed successful remote GitHub Actions runs:** [run 45019243591](https://github.com/aerolit266/AlekS-DTS-webOS/actions/runs/45019243591) on commit `5c4bc754` and [run 45019295686](https://github.com/aerolit266/AlekS-DTS-webOS/actions/runs/45019295686) on report commit `083fff3ce9b2b00cfa113e610de3f0547b9dd5b1`, both `completed/success`. A subsequent documentation-only commit triggers a new check but does not invalidate the two verified runs.
 
 ## Remaining limitations
 
