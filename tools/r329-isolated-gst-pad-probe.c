@@ -26,6 +26,7 @@ typedef struct {
     guint64 pcm_buffers, pcm_samples, pcm_nonzero, pcm_bytes;
     guint64 segment_time, segment_bytes, segment_other;
     guint64 caps_dts, caps_other, frames_before_events;
+    char first_input_caps_family[64];
     gdouble pcm_squared_sum;
     guint32 pcm_peak;
     gboolean seen_stream, seen_caps, seen_segment;
@@ -53,9 +54,28 @@ static GstPadProbeReturn inspect_encoded(GstPad *pad, GstPadProbeInfo *info,
                 gst_event_parse_caps(e, &caps);
                 if (caps && gst_caps_get_size(caps) > 0) {
                     const GstStructure *st = gst_caps_get_structure(caps, 0);
-                    if (g_strcmp0(gst_structure_get_name(st), "audio/x-dts") == 0)
+                    const char *kind = gst_structure_get_name(st);
+                    if (g_strcmp0(kind, "audio/x-dts") == 0)
                         s->caps_dts++;
-                    else s->caps_other++;
+                    else
+                        s->caps_other++;
+                    /* Media type only: no properties, codec private data,
+                       media names, paths, URLs or arbitrary debug strings. */
+                    gboolean safe = kind && g_str_has_prefix(kind, "audio/") &&
+                                    strlen(kind) < sizeof(s->first_input_caps_family);
+                    if (safe) {
+                        for (const char *p = kind; *p; ++p) {
+                            if (!(g_ascii_isalnum(*p) || *p == '/' ||
+                                  *p == '-' || *p == '_' || *p == '+')) {
+                                safe = FALSE;
+                                break;
+                            }
+                        }
+                    }
+                    if (!s->first_input_caps_family[0])
+                        g_strlcpy(s->first_input_caps_family,
+                                  safe ? kind : "OTHER_OR_UNAVAILABLE",
+                                  sizeof(s->first_input_caps_family));
                 }
                 s->seen_caps = TRUE;
                 break;
@@ -164,6 +184,9 @@ static void print_result(const R329Stats *s, gboolean done, gint native, gint wr
     printf("R329_EOS=%s\n", done ? "YES" : "NO");
     printf("R329_INPUT_STREAM_START=%" G_GUINT64_FORMAT "\n", s->stream_events);
     printf("R329_INPUT_DTS_CAPS=%" G_GUINT64_FORMAT "\n", s->caps_dts);
+    printf("R329_INPUT_CAPS_EVENTS=%" G_GUINT64_FORMAT "\n", s->caps_events);
+    printf("R329_INPUT_CAPS_OTHER=%" G_GUINT64_FORMAT "\n", s->caps_other);
+    printf("R329_INPUT_CAPS_FAMILY=%s\n", s->first_input_caps_family);
     printf("R329_INPUT_SEGMENT_TIME=%" G_GUINT64_FORMAT "\n", s->segment_time);
     printf("R329_INPUT_SEGMENT_BYTES=%" G_GUINT64_FORMAT "\n", s->segment_bytes);
     printf("R329_INPUT_SEGMENT_OTHER=%" G_GUINT64_FORMAT "\n", s->segment_other);
