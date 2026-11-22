@@ -68,3 +68,17 @@ jobs:
           assert module.PATTERNS["AC3"].search(b"GstOMXAc3DecBin")
           print("RESULT=R333_R334_CODEC_TAXONOMY_CI_PASS")
           PY
+      - name: Validate R335/R336 precise DTS cold-vs-recovered differential
+        run: |
+          python3 tools/r335-lg-precise-dts-handoff-timeline.py selftest
+          python3 tools/r336-lg-cold-error-category.py selftest
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          for path in (
+              "tools/r335-lg-precise-dts-handoff-timeline.py",
+              "tools/r336-lg-cold-error-category.py",
+          ):
+              ast.parse(Path(path).read_text())
+          print("RESULT=R335_R336_SOURCE_INTEGRITY_PASS")
+          PY
