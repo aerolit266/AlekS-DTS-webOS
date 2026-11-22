@@ -83,7 +83,7 @@ def parse_pa(text, wanted):
             block[key.lower()] = val.lower() == "yes"
         elif key == "Volume":
             pct = [int(value) for value in
-                   re.findall(r"/\\s*(\\d{1,3})%\\s*/", val)[:8]]
+                   re.findall(r"/\s*(\d{1,3})%\s*/", val)[:8]]
             if pct and all(0 <= value <= 200 for value in pct):
                 block["volume_percent_min"] = min(pct)
                 block["volume_percent_max"] = max(pct)
@@ -162,7 +162,7 @@ def pcm_hw_params():
         if name == "format" and val.strip() in {"S16_LE", "S32_LE"}:
             result[name] = val.strip()
         elif name in ("channels", "rate"):
-            numeric = re.match(r"^(\\d{1,15})(?:\\s|$)", val.strip())
+            numeric = re.match(r"^(\d{1,15})(?:\s|$)", val.strip())
             if numeric:
                 result[name] = int(numeric.group(1))
     return result
