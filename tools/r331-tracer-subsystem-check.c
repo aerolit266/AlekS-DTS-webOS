@@ -7,14 +7,19 @@
  */
 #include <gst/gst.h>
 #include <gst/gsttracer.h>
+#include <dlfcn.h>
 #include <stdio.h>
 #include <string.h>
 
 int main(int argc, char **argv) {
   if (argc != 1) return 2;
   gst_init(&argc, &argv);
-  GList *active = gst_tracing_get_active_tracers();
-  GList *factories = gst_tracer_factory_get_list();
+  typedef GList *(*GetTracers)(void);
+  void *sym=dlsym(RTLD_DEFAULT,"gst_tracing_get_active_tracers");
+  GetTracers get_tracers=NULL;
+  if(sym) memcpy(&get_tracers,&sym,sizeof(get_tracers));
+  GList *active=get_tracers ? get_tracers() : NULL;
+  GList *factories=gst_tracer_factory_get_list();
   unsigned active_count = 0, r331_count = 0, factories_count = 0;
   for (GList *n = active; n; n=n->next) {
     active_count++;
@@ -26,6 +31,7 @@ int main(int argc, char **argv) {
   for (GList *n = factories; n; n=n->next) {
     factories_count++;
   }
+  printf("R331_GST_ACTIVE_TRACER_API=%s\n",get_tracers?"AVAILABLE":"MISSING");
   printf("R331_GST_ACTIVE_TRACER_COUNT=%u\n",active_count);
   printf("R331_GST_ACTIVE_ALEKS_TRACER_COUNT=%u\n",r331_count);
   printf("R331_GST_KNOWN_TRACER_FACTORIES=%u\n",factories_count);
