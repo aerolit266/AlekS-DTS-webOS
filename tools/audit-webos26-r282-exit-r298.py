@@ -121,7 +121,7 @@ def selftest():
     assert not analyze("\n".join(make_case(m, 0, custom="no") for m in MODES))["all_clean"]
     assert observed["root_cause_proven"] is False
     assert observed["native_audio_tested"] is False
-    print("R298_SELFTEST_PASS tests=11 legacy_sigterm=INCOMPLETE clean_four=PASS")
+    print("R298_SELFTEST_PASS assertions=14 legacy_sigterm=INCOMPLETE clean_four=PASS")
 
 
 def main():
