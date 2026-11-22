@@ -152,11 +152,11 @@ def discover(paths, archives, pins):
 def stage(findings, target, pins):
     """Stage only exact matches. Never replace existing files or traverse links."""
     target = Path(target)
-    if target.is_symlink():
-        raise ValueError("STAGE_DIR_SYMLINK_REJECTED")
+    if any(part.is_symlink() for part in (target, *target.parents)):
+        raise ValueError("STAGE_PATH_SYMLINK_REJECTED")
     target.mkdir(mode=0o700, parents=True, exist_ok=True)
-    if target.is_symlink():
-        raise ValueError("STAGE_DIR_SYMLINK_REJECTED")
+    if any(part.is_symlink() for part in (target, *target.parents)):
+        raise ValueError("STAGE_PATH_SYMLINK_REJECTED")
     status = {}
     for name, data in findings.items():
         if name not in pins or hexdigest(data) != pins[name]:
@@ -212,6 +212,38 @@ def selftest():
         assert all(x == "STAGED_VERIFIED" for x in outputs.values())
         second = stage(found, root / "verified", pins)
         assert all(x == "ALREADY_VERIFIED" for x in second.values())
+        # A traversal-only tar member must never be promoted even when its
+        # content happens to match a requested SHA.
+        traversal = root / "traversal.tar.gz"
+        with tarfile.open(traversal, "w:gz") as tf:
+            payload = b"original-like mock audio"
+            info = tarfile.TarInfo("../../dts51-audioonly.mkv")
+            info.size = len(payload)
+            tf.addfile(info, io.BytesIO(payload))
+        bad_found, bad_stats = discover([], [traversal], pins)
+        assert not bad_found and bad_stats["unsafe_entries"] == 1
+        # ZIP paths are likewise inspected, but never extracted using their
+        # archive member path. Also reject a UNIX symlink ZIP entry.
+        zipped = root / "nested.zip"
+        with zipfile.ZipFile(zipped, "w") as zf:
+            zf.writestr("qa/r122_dts_core_probe.h", b"original-like mock header")
+            symlink = zipfile.ZipInfo("nested/dts51-audioonly.mkv")
+            symlink.create_system = 3
+            symlink.external_attr = (stat.S_IFLNK | 0o777) << 16
+            zf.writestr(symlink, b"original-like mock audio")
+        zip_found, zip_stats = discover([], [zipped], pins)
+        assert set(zip_found) == {"r122_dts_core_probe.h"}
+        assert zip_stats["unsafe_entries"] == 1
+        # A symlink in staging ancestors must be denied.
+        fake_link = root / "alias"
+        fake_link.symlink_to(root / "verified", target_is_directory=True)
+        try:
+            stage({"r122_dts_core_probe.h": b"original-like mock header"},
+                  fake_link / "children", pins)
+        except ValueError as e:
+            assert "STAGE_PATH_SYMLINK_REJECTED" in str(e)
+        else:
+            raise AssertionError("stage parent symlink should be rejected")
         (root / "verified" / "dts51-audioonly.mkv").write_bytes(b"changed")
         try:
             stage(found, root / "verified", pins)
@@ -219,7 +251,7 @@ def selftest():
             assert "HASH_CONFLICT" in str(e)
         else:
             raise AssertionError("existing conflict should be rejected")
-    print("R303_SELFTEST_PASS exact_hash_tar_nested_stage_idempotency_conflict")
+    print("R303_SELFTEST_PASS sha256_tar_zip_traversal_symlink_stage_idempotency_conflict")
 
 
 def main():
