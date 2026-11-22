@@ -481,3 +481,40 @@ On Finnish VPS mediarus.com: initial independent C99 ASan/UBSan compile/run PASS
 **EOS limitation:** The pure C99 R188 core does not itself receive GStreamer EOS events. R304 confirms a truncated end-of-input leaves `framer.have > 0`, which the separate GStreamer wrapper is designed to reject at EOS; **it does not execute or verify the actual GstPad EOS / STREAM_START / FLUSH_STOP event handlers**. VPS has `gst-launch-1.0` but lacks `gstreamer-1.0` development headers (`pkg-config gstreamer-1.0` MISSING), so a GStreamer plugin integration build was not attempted; do not install packages onto the VPS just for this production-adjacent QA without appropriate planning.
 
 **Boundary:** The original R188 sanitizer QA that requires the absent original R122 header + two owner DTS fixtures is **still BLOCKED**. R304 does not make that old original validation PASS. It does not verify genuine DTS bitstream acceptance, any decoder, PCM samples, acoustic sound, or first-start silence on the kitchen LG. R278 production files and uMS/Starfish services were not changed. Separate lab QA PASS only.
+
+## R305 (2026-11-22): real GStreamer GstPad event regression on original lab R188, ISOLATED
+
+**Purpose:** Extend R304 pure C99 synthetic first-frame checks to the **actual original R188 GStreamer wrapper** and real GStreamer pad-event dispatch: `STREAM_START`, `FLUSH_START`, `FLUSH_STOP`, `EOS`, `CAPS`, `GST_FLOW_NOT_NEGOTIATED`. All eight cases run on the Finnish VPS against **GStreamer 1.24.2**. This does NOT use genuine DTS media, the original missing R122 parser, or the kitchen's production R278 plugin. No LG, TORMOZ, service, firmware, audio sink or proprietary media accessed.
+
+### Isolated SDK provisioning; no system package installation
+
+- VPS runtime had `/usr/bin/gst-launch-1.0` and GStreamer 1.24.2/GLib runtime libraries, but lacked dev headers and `.pc` files. Downloaded **only two matching Ubuntu Noble developer `.deb` packages** over HTTPS to a private `/tmp` directory and extracted with `dpkg-deb -x`; no `apt install`, no system include/library changes, no service restarts.
+- GStreamer 1.24.2 developer package SHA256 `616dab4dbd89fb66dda41e5195c5890ddce0b1c9d467d649cf3f7773d46165a8`; GLib 2.80.0 developer package SHA256 `6d1d88d68192256603c0de05d084b8ef06ed9b16753215ec2c1ef9ef5fa15014`.
+- The original experimental C code `/opt/gamefree24-vps-mcp/src/r188_gst_framer.c` SHA256 `773aea865d8b49c36b7cf72b8baf56db5615670b80776622b1e5e23ca0146a52`; its companion `r188_dts_framer.h` SHA256 `8fcf17dd9d9890d26542f093a87f91e760e8ea8999619e17b4e56485b04bfa97`, both **unmodified**.
+- Isolated GStreamer plugin builds from those original C sources linked against the already installed runtime `.so.0` files. Only `r122_dts_core_probe.h` in the private build directory was the **explicitly synthetic and non-DTS-conformant R304 test double**, SHA256 `977f09779d5a3801aca383c876da0d6fe173acfc21823e55f4e9bed3967796fd`.
+
+### Genuine event test harness and defect in its first iteration
+
+- Added [tools/test-r188-real-gstpad-events-r305.c](../tools/test-r188-real-gstpad-events-r305.c), final commit `f81b2d08f8cd7b469005353de994b137b84c8429`, SHA256 `935c03e126514559df70642079c859e94abf6f3548d634f1fbe89b7a5af3c0bf`. It builds actual `GstPad` upstream and downstream peers, instantiates the GStreamer-registered R188 plugin, pushes real `GstEvent` messages and `GstBuffer` payloads through the `GstPad` chain function, checks byte-for-byte output and downstream caps metadata. The downstream is a **test capture pad**, never a speaker/audio sink.
+- First iteration: five cases PASS, added direct format change 2ch/48k→6ch/44.1k returned `GST_FLOW_NOT_NEGOTIATED`. GStreamer `GST_DEBUG` traced this to our **bare test sink pad lacking an appropriate CAPS/ACCEPT_CAPS query**, whose default query advertised `EMPTY` or only the old negotiated format. Adding an explicitly flexible `downstream_query()` that accepts `audio/x-dts` corrected the lab harness. Repeated direct format change then PASS, without changing original R188 C code or installing a speculative production patch.
+
+**Eight source-backed real-GStreamer scenarios, verified:**
+
+| # | Event/condition | Result |
+| --- | --- | --- |
+| 1 | Actual `STREAM_START`, fragmented first frame (single-byte chunks), downstream full frame, `EOS` | PASS |
+| 2 | `FLUSH_START`/`FLUSH_STOP` removes partially buffered 13-byte frame then fresh stream | PASS |
+| 3 | New `STREAM_START` resets prior incomplete 37-byte frame | PASS |
+| 4 | Incomplete 71-byte frame at `EOS` is rejected; no downstream frame/EOS forwarded | PASS |
+| 5 | After completed `EOS`, FLUSH and new STREAM_START permit replay in same element | PASS |
+| 6 | Dynamic CAPS change from synthetic stereo 48k to 6-channel 44.1k forwarded and accepted | PASS |
+| 7 | Invalid sync produces `GST_FLOW_ERROR`; FLUSH and new stream recover cleanly | PASS |
+| 8 | Downstream deliberate `GST_FLOW_NOT_NEGOTIATED` propagates; subsequent FLUSH/restart recovers | PASS |
+
+### Reproducible release QA
+
+- Added [tools/run-r188-real-gstpad-events-r305.sh](../tools/run-r188-real-gstpad-events-r305.sh), commit `d231df20173ef486b3c3c9f1a28d0e7e074e340e`, SHA256 `dd49323556efc24b978bdd1ed7e7019b710e3760a3a8cdd93e7b2f06c8651424`. It independently fetches and verifies BOTH developer package pins and all FOUR source/test pins, extracts under `mktemp`/`tmp` with `trap` cleanup, compiles **native optimized -O2** and **ASan+UBSan -O1** versions, uses separate private GStreamer registry files, then requires exactly eight PASS markers and terminal `RESULT=R305_GSTPAD_EVENTS_8_OF_8_PASS` from each run.
+- **VERIFIED ON VPS by running that exact downloaded immutable-commit script:** `sh -n PASS`; 6/6 SHA256 pins PASS; `R305_SDK_AND_SOURCE_PIN_PASS`, `R305_GSTREAMER_NATIVE_O2_8_OF_8_PASS`, `R305_GSTREAMER_ASAN_UBSAN_8_OF_8_PASS`, final `RESULT=R305_REAL_GSTPAD_EVENT_QA_PASS; SYNTHETIC_HEADER_NO_REAL_DTS_NO_LG`.
+- GStreamer plugin-scan `GST_REGISTRY_FORK=no` is scoped to the sandbox test process to ensure AddressSanitizer is initialized in the same sanitized process as the plugin; it does **not** change system GStreamer. ASan/UBSan error detection enabled; leak detection disabled because GLib/GStreamer process-global caches make leak checks unsuitable for this harness. Therefore no claim of full system leak-free status.
+
+**Interpretation and boundaries:** R188's real GstPad event handlers appear functional in these synthetic scenarios on GStreamer 1.24.2, so no R188 code changes were warranted. However this is an x86_64 userspace lab; kitchen LG webOS26 has a different media environment and uses **R278**, not the experimental R188 plugin. The original R188 owner-fixture QA remains BLOCKED due to the missing SHA-pinned original R122 and two DTS media fixtures. DTS decode/PCM sound and first-boot silent-vs-audible comparison on LG remain **NOT VERIFIED**. No change to installed DTS rank, decoder, production UMS, TV, firmware, or SSH.
