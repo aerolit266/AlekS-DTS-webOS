@@ -37,7 +37,9 @@
 #ifndef PACKAGE
 #define PACKAGE "aleks-dts"
 #endif
+#ifndef R331_WINDOW_US
 #define R331_WINDOW_US (180LL * 1000000LL)
+#endif
 #define R331_PCM_SAMPLE_BUDGET_PER_BUFFER 1024U
 #define R331_MAX_TOTAL_SAMPLES 14000000ULL
 
@@ -245,7 +247,7 @@ static void export_snapshot(AlekSR331Tracer *s, guint duration_seconds) {
    "\"map_failures\":%" G_GUINT64_FORMAT ",\"ignored_buffers\":%" G_GUINT64_FORMAT ","
    "\"dts_decoder_seen\":%s,\"pcm_seen\":%s,"
    "\"raw_pcm_exported\":false,\"process_attached\":false,"
-   "\"audio_files_created\":0,\"live_player_changed\":false}\n",
+   "\"audio_files_created\":0,\"pipeline_modified\":false,\"tracer_loaded\":true}\n",
    duration_seconds,s->input_buffers,s->input_be16_sync,s->missing_pts,
    s->event_start,s->event_caps,s->event_time,s->event_bytes,
    s->pcm_buffers,s->pcm_samples,s->pcm_nonzero,dbfs,peak,
