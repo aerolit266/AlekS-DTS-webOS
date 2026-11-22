@@ -543,3 +543,21 @@ With raw DTS supplied directly as arbitrary `filesrc` chunks into `dtsdec` (no p
 - **No firmware/TV or production plugin changes, no new packages, no hardware audio output**. The old R188 owner-fixture QA remains blocked by missing original R122 and two DTS samples; R306 is a separately labeled, real-encoded-DTS lab lineage.
 
 **Next evidence needed:** On kitchen LG, safely record first DTS sample/PCM production and **how the media/demuxer passes packet/frame boundaries to installed R278** in a silent versus audible session, plus audio output allocation state, only through authorized read-only diagnostics without interrupting the user's playback. Do not blindly insert the experimental R188 framer, switch tracks, change plugin ranks or restart LG services based on the VPS result.
+
+
+## R307 (2026-11-22): original R278 ARM release + included DTS fixture packet boundaries
+
+**Offline verification only, not kitchen LG playback.** Fetched SHA-pinned public R278 release (348,539 bytes, SHA256 cafb3e014f407a4a0dda6bd50a0e4f983aa0b35ea1f53e705f504aed0a094ea1). Verified all **four included ARM32 plugins** and two real DTS Matroska fixtures by the hashes in the original R278 verifier. Also verified the R56 LGPL relink archive (gstaleksdtsdec.o plus libdcadec sources).
+
+**Static architecture:** R239 libgstaleksdts16dec.so is an element bin referencing aleksdtsdec, audioconvert and S16LE capsfilter. R56 libgstaleksdts.so uses GstAudioDecoder and dcadec_context_parse / gst_audio_decoder_finish_frame. R130 is a separate input caps / initial event guard using gst_pad_push and GQueue. The caps bridge maps unknown A_DTS to DTS caps without changing bytes. **No proof of complete-frame assembly** at the real R278 decoder input; static imports cannot establish live GstBuffer boundaries.
+
+**Coverage gap:** Existing [tools/verify-r278-webos26.sh](../tools/verify-r278-webos26.sh) only tests its DTS stereo and DTS 5.1 fixtures through Matroska demux -> queue -> decodebin -> fakesink. That is a valid framed-path smoke test but does not check raw fragmented DTS input.
+
+**On VPS stock GStreamer 1.24.2 dtsdec (NOT R278 ARM binary)** the real SHA-verified R278 clips produced:
+- Matroska input at source block sizes **11, 97 and 4096**, respectively: full, SHA-identical PCM **48,128 frames** for stereo and **48,128 frames** for DTS 5.1.
+- The same DTS compressed bytes extracted losslessly and fed **raw** with block 11: **40,960 stereo / 44,032 5.1 PCM frames**; block 97: **47,616 / 47,104**; block 4096: **48,128 / 48,128**. Arbitrary raw byte chunks lose decoded output on this stock VPS implementation, consistent with R306. Frame-loss count can vary between runs.
+- PCM SHA256 for all packetized cases: stereo 19a367f440beedaed0ffdb3e18403c9ed14124f289e354983036b51b347c0773; 5.1 d7d992363b866249f7e18790beda1f9e2e5f202d9a7536f5a9e1606c605f28e6.
+
+Created [tools/audit-r278-release-packet-boundaries-r307.py](../tools/audit-r278-release-packet-boundaries-r307.py), final commit 61c554535e8c77d318345ea768c15ec836673cc3 SHA256 c07feac0f23be23d3a42fc16caf8c36304e39b271c6eb571dce3567deb53faa8. Runner automatically verifies archive/plugin/DTS fixture SHA256, checks ELF32 ARM identity and static plugin identifiers, uses actual DTS from bundled fixtures for six decode paths per clip and temporary PCM SHA comparisons; **R307_FINAL_PINNED_RELEASE_QA_PASS** on VPS. Complete report: [docs/R307_R278_RELEASE_PACKET_BOUNDARY_AUDIT.md](R307_R278_RELEASE_PACKET_BOUNDARY_AUDIT.md).
+
+**Important:** release explicitly targets the **hall** TV (65NANO896PC), while the kitchen LG's currently loaded R278 plugin file hashes are unverified and may differ. R307 did not access LG, verify Starfish's actual decoder packetization or prove the cause of the owner's initial DTS silence. Production plugin/firmware/rank/config remain unchanged. The next authorized measurement must compare current on-device SHA256, demuxer/input GstBuffers and first PCM/sink state during real silent/audible playback; avoid speculative installation of the experimental framer.
