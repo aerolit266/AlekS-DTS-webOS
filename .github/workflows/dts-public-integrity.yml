@@ -107,3 +107,28 @@ jobs:
           assert "! rasink" not in qa
           print("RESULT=R337_OBSERVER_FAIL_CLOSED_CI_CONTRACT_PASS")
           PY
+      - name: Validate R338 observer/controller matched deployment strings
+        run: |
+          sh -n tools/r338-runtime-window-lg.sh
+          sh -n tools/r338-verify-native-sink-lg.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          obs=Path("tools/r338-bounded-realtek-sink-observer.c").read_text()
+          control=Path("tools/r338-runtime-window-lg.sh").read_text()
+          qa=Path("tools/r338-verify-native-sink-lg.sh").read_text()
+          base=Path("tools/r337-bounded-realtek-sink-observer.c").read_text()
+          assert base.replace("R337","R338").replace("r337","r338")==obs
+          assert 'ALEKS_R338_ENABLE' in obs
+          assert '"/run/aleks-r338/metrics"' in obs
+          assert '"r338-%ld.json"' in obs
+          assert 'ALEKS_R338_ISOLATED_QA' in obs
+          assert 'ALEKS_R338_ENABLE=YES' in control
+          assert 'ROOT=/run/aleks-r338' in control
+          assert 'systemd-run --unit=aleks-r338b-rollback --on-active=140s' in control
+          assert 'EXPECTED_HOOK=45ba5af2e437b94d43c2902fd7471dc852ae8fa285ff01502a16197bbf799dd1' in control
+          assert 'lab=/tmp/aleks-r338-stage-20261123' in qa
+          assert 'fakesink sync=false' in qa
+          assert 'libaleksr338hook.so' in qa
+          assert 'R338_LG_ISOLATED_REAL_R278_SINK_2_OF_2_PASS' in qa
+          print('RESULT=R338_OBSERVER_CONTROLLER_STAGE_CONSISTENCY_PASS')
+          PY
