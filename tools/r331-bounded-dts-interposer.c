@@ -1,0 +1,374 @@
+/*
+ * R331 fallback: bounded, process-gated, low-dependency GStreamer
+ * LD_PRELOAD observer for vendor builds with GST_TRACERS disabled.
+ *
+ * Symbol interposition only on gst_pad_push and gst_pad_push_event.
+ * No replacement of codec/system libraries and no mutation of buffers,
+ * pad state, routing, service controls or audio output.
+ * All GStreamer APIs are resolved lazily at runtime: this SO has NO
+ * libgstreamer/libglib/libgobject DT_NEEDED in umediaserver parent.
+ *
+ * Only Starfish child or ALEKS_R331_ISOLATED_QA=YES is active.
+ * Exports counts and normalized PCM energy only; never decoded/encoded
+ * user data, streams, media identifiers, URLs, timestamps or secrets.
+ * Maximum active 180 seconds, private JSON on /run tmpfs, no hooks
+ * block on file writes; worker writes once every 2s.
+ *
+ * The owner must authorize even temporary production use separately;
+ * first test exclusively with public DTS R278 fixtures and fakesink.
+ * SPDX-License-Identifier: MIT
+ */
+#define _GNU_SOURCE
+#include <gst/gst.h>
+#include <dlfcn.h>
+#include <pthread.h>
+#include <stdatomic.h>
+#include <time.h>
+#include <math.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#ifndef R331_WINDOW_SECS
+#define R331_WINDOW_SECS 180
+#endif
+#define MAX_PCM_PER_BUFFER 1024U
+#define MAX_PCM_TOTAL 14000000U
+
+typedef GstFlowReturn (*PadPush)(GstPad*,GstBuffer*);
+typedef gboolean (*PadPushEvent)(GstPad*,GstEvent*);
+typedef GstPad* (*PadGetPeer)(GstPad*);
+typedef GstElement* (*PadGetParent)(GstPad*);
+typedef GstElementFactory* (*ElementFactory)(GstElement*);
+typedef const gchar* (*FactoryName)(GstPluginFeature*);
+typedef void (*ObjUnref)(gpointer);
+typedef GstCaps* (*PadGetCaps)(GstPad*);
+typedef guint (*CapsSize)(const GstCaps*);
+typedef const GstStructure* (*CapsStructure)(const GstCaps*,guint);
+typedef const gchar* (*StructureName)(const GstStructure*);
+typedef const gchar* (*StructureString)(const GstStructure*,const gchar*);
+typedef gboolean (*StructureInt)(const GstStructure*,const gchar*,gint*);
+typedef void (*MiniUnref)(GstMiniObject*);
+typedef gboolean (*BufferMap)(GstBuffer*,GstMapInfo*,GstMapFlags);
+typedef void (*BufferUnmap)(GstBuffer*,GstMapInfo*);
+typedef void (*EventSegment)(GstEvent*,const GstSegment**);
+
+static struct {
+  PadPush push;
+  PadPushEvent push_event;
+  PadGetPeer get_peer;
+  PadGetParent get_parent;
+  ElementFactory get_factory;
+  FactoryName get_name;
+  ObjUnref object_unref;
+  PadGetCaps current_caps;
+  CapsSize caps_size;
+  CapsStructure caps_structure;
+  StructureName structure_name;
+  StructureString structure_string;
+  StructureInt structure_int;
+  MiniUnref mini_unref;
+  BufferMap buffer_map;
+  BufferUnmap buffer_unmap;
+  EventSegment parse_segment;
+  int available;
+} a;
+static pthread_once_t resolve_once=PTHREAD_ONCE_INIT;
+static pthread_mutex_t mu=PTHREAD_MUTEX_INITIALIZER;
+static atomic_int enabled=ATOMIC_VAR_INIT(0);
+static unsigned long started_at=0;
+static int qa_mode=0;
+static char output_path[192];
+static struct {
+  uint64_t input_buffers, be16_sync, missing_pts;
+  uint64_t event_start,event_caps,event_time,event_bytes;
+  uint64_t pcm_buffers, pcm_samples, pcm_nonzero, bad_maps, ignored_pcm;
+  uint64_t clipped, s16_buffers, s32_buffers, f32_buffers;
+  double squared, peak;
+  int pcm_channels, pcm_rate;
+} stats;
+
+static void resolve(void) {
+#define RESOLVE(field,name) do { \
+  void *p=dlsym(RTLD_NEXT,name); \
+  memcpy(&a.field,&p,sizeof(p)); \
+} while(0)
+  RESOLVE(push,"gst_pad_push");
+  RESOLVE(push_event,"gst_pad_push_event");
+  RESOLVE(get_peer,"gst_pad_get_peer");
+  RESOLVE(get_parent,"gst_pad_get_parent_element");
+  RESOLVE(get_factory,"gst_element_get_factory");
+  RESOLVE(get_name,"gst_plugin_feature_get_name");
+  RESOLVE(object_unref,"gst_object_unref");
+  RESOLVE(current_caps,"gst_pad_get_current_caps");
+  RESOLVE(caps_size,"gst_caps_get_size");
+  RESOLVE(caps_structure,"gst_caps_get_structure");
+  RESOLVE(structure_name,"gst_structure_get_name");
+  RESOLVE(structure_string,"gst_structure_get_string");
+  RESOLVE(structure_int,"gst_structure_get_int");
+  RESOLVE(mini_unref,"gst_mini_object_unref");
+  RESOLVE(buffer_map,"gst_buffer_map");
+  RESOLVE(buffer_unmap,"gst_buffer_unmap");
+  RESOLVE(parse_segment,"gst_event_parse_segment");
+#undef RESOLVE
+  a.available = a.push && a.push_event && a.get_peer && a.get_parent &&
+                a.get_factory && a.get_name && a.object_unref &&
+                a.current_caps && a.caps_size && a.caps_structure &&
+                a.structure_name && a.structure_string && a.structure_int &&
+                a.mini_unref && a.buffer_map && a.buffer_unmap &&
+                a.parse_segment;
+}
+
+static unsigned long mono_seconds(void) {
+  struct timespec ts={0};
+  return clock_gettime(CLOCK_MONOTONIC,&ts)==0 ? (unsigned long)ts.tv_sec : 0;
+}
+static int active(void) {
+  if(!atomic_load_explicit(&enabled,memory_order_relaxed)) return 0;
+  if(mono_seconds()-started_at >= R331_WINDOW_SECS) {
+    atomic_store_explicit(&enabled,0,memory_order_relaxed);
+    return 0;
+  }
+  return 1;
+}
+static int owned_by_decoder(GstPad *pad) {
+  if(!pad || !a.available) return 0;
+  GstElement *elem=a.get_parent(pad);
+  if(!elem) return 0;
+  GstElementFactory *fact=a.get_factory(elem);
+  const gchar *name=fact ? a.get_name((GstPluginFeature*)fact) : NULL;
+  int match=name && (!strcmp(name,"aleksdts16dec") ||
+                      (qa_mode && !strcmp(name,"dtsdec")));
+  a.object_unref(elem);
+  return match;
+}
+static int peer_is_decoder(GstPad *pad) {
+  if(!pad) return 0;
+  GstPad *peer=a.get_peer(pad);
+  if(!peer) return 0;
+  int result=owned_by_decoder(peer);
+  a.object_unref(peer);
+  return result;
+}
+static void record_input(GstBuffer *buffer) {
+  if(!buffer) return;
+  GstMapInfo m;
+  if(!a.buffer_map(buffer,&m,GST_MAP_READ)) {
+    pthread_mutex_lock(&mu);stats.bad_maps++;pthread_mutex_unlock(&mu);
+    return;
+  }
+  const int sync=m.size>=4 && m.data[0]==0x7f && m.data[1]==0xfe &&
+                 m.data[2]==0x80 && m.data[3]==0x01;
+  const int no_pts=!GST_BUFFER_PTS_IS_VALID(buffer);
+  a.buffer_unmap(buffer,&m);
+  pthread_mutex_lock(&mu);
+  stats.input_buffers++;
+  stats.be16_sync+=sync;
+  stats.missing_pts+=no_pts;
+  pthread_mutex_unlock(&mu);
+}
+static void record_pcm(GstPad *pad,GstBuffer *buffer) {
+  if(!pad || !buffer) return;
+  GstCaps *caps=a.current_caps(pad);
+  if(!caps) return;
+  int kind=0,channels=0,rate=0;
+  if(a.caps_size(caps)==1) {
+    const GstStructure *st=a.caps_structure(caps,0);
+    if(st && a.structure_name(st) &&
+       !strcmp(a.structure_name(st),"audio/x-raw")) {
+      const gchar *fmt=a.structure_string(st,"format");
+      const gchar *layout=a.structure_string(st,"layout");
+      if(fmt && !strcmp(fmt,"S16LE"))kind=1;
+      if(fmt && !strcmp(fmt,"S32LE"))kind=2;
+      if(fmt && !strcmp(fmt,"F32LE"))kind=3;
+      a.structure_int(st,"channels",&channels);
+      a.structure_int(st,"rate",&rate);
+      if((layout && strcmp(layout,"interleaved")) ||
+         channels<1 || channels>8 || rate<8000 || rate>192000)kind=0;
+    }
+  }
+  a.mini_unref((GstMiniObject*)caps);
+  if(!kind)return;
+  GstMapInfo m;
+  if(!a.buffer_map(buffer,&m,GST_MAP_READ)) {
+    pthread_mutex_lock(&mu);stats.bad_maps++;pthread_mutex_unlock(&mu);
+    return;
+  }
+  guint stride=kind==1?2:4;
+  if(m.size%stride || m.size>262144) {
+    a.buffer_unmap(buffer,&m);
+    pthread_mutex_lock(&mu);stats.ignored_pcm++;pthread_mutex_unlock(&mu);
+    return;
+  }
+  guint n=(guint)(m.size/stride);
+  if(n>MAX_PCM_PER_BUFFER)n=MAX_PCM_PER_BUFFER;
+  uint64_t nz=0,clip=0;
+  double sq=0,peak=0;
+  for(guint i=0;i<n;i++) {
+    const guint8 *p=m.data+(size_t)i*stride;
+    double value=0;
+    if(kind==1) {
+      int16_t v=(int16_t)((uint16_t)p[0]|((uint16_t)p[1]<<8));
+      value=(double)v/32768.0;
+    } else if(kind==2) {
+      int32_t v=(int32_t)((uint32_t)p[0]|((uint32_t)p[1]<<8)|
+                          ((uint32_t)p[2]<<16)|((uint32_t)p[3]<<24));
+      value=(double)v/2147483648.0;
+    } else {
+      float v;
+      memcpy(&v,p,sizeof(v));
+      if(!isfinite(v))continue;
+      value=v;
+    }
+    nz+=value!=0;
+    double mag=fabs(value);
+    clip+=mag>1.0;
+    if(mag>peak)peak=mag;
+    sq+=value*value;
+  }
+  a.buffer_unmap(buffer,&m);
+  pthread_mutex_lock(&mu);
+  if(stats.pcm_samples < MAX_PCM_TOTAL) {
+    stats.pcm_buffers++;
+    stats.pcm_samples+=n;
+    stats.pcm_nonzero+=nz;
+    stats.clipped+=clip;
+    stats.squared+=sq;
+    if(peak>stats.peak)stats.peak=peak;
+    stats.pcm_rate=rate;
+    stats.pcm_channels=channels;
+    stats.s16_buffers+=kind==1;
+    stats.s32_buffers+=kind==2;
+    stats.f32_buffers+=kind==3;
+  }
+  pthread_mutex_unlock(&mu);
+}
+static void record_event(GstEvent *event) {
+  if(!event)return;
+  pthread_mutex_lock(&mu);
+  switch(GST_EVENT_TYPE(event)) {
+    case GST_EVENT_STREAM_START:stats.event_start++;break;
+    case GST_EVENT_CAPS:stats.event_caps++;break;
+    case GST_EVENT_SEGMENT: {
+      const GstSegment *seg=NULL;
+      a.parse_segment(event,&seg);
+      if(seg && seg->format==GST_FORMAT_TIME)stats.event_time++;
+      else stats.event_bytes++;
+      break;
+    }
+    default: break;
+  }
+  pthread_mutex_unlock(&mu);
+}
+static void save_snapshot(unsigned elapsed) {
+  char json[1000];
+  pthread_mutex_lock(&mu);
+  double rms=stats.pcm_samples && stats.squared>0 ?
+             10*log10(stats.squared/(double)stats.pcm_samples) : -999.0;
+  double peak=stats.peak>0 ? 20*log10(stats.peak) : -999.0;
+  int count=snprintf(json,sizeof(json),
+    "{\"schema\":\"aleks-dts-r331-interpose-v1\",\"elapsed_s\":%u,"
+    "\"input_buffers\":%llu,\"be16_sync\":%llu,\"missing_pts\":%llu,"
+    "\"event_start\":%llu,\"event_caps\":%llu,\"event_time\":%llu,"
+    "\"event_bytes\":%llu,\"pcm_buffers\":%llu,\"pcm_sampled\":%llu,"
+    "\"pcm_nonzero\":%llu,\"pcm_rms_dbfs\":%.2f,\"pcm_peak_dbfs\":%.2f,"
+    "\"pcm_channels\":%d,\"pcm_rate\":%d,"
+    "\"format_s16_buffers\":%llu,\"format_s32_buffers\":%llu,"
+    "\"format_f32_buffers\":%llu,\"bad_maps\":%llu,"
+    "\"ignored_pcm\":%llu,\"clipped\":%llu,"
+    "\"raw_pcm_exported\":false,\"audio_files_created\":0,"
+    "\"pipeline_mutated\":false,\"external_process_attached\":false}\n",
+    elapsed,(unsigned long long)stats.input_buffers,
+    (unsigned long long)stats.be16_sync,
+    (unsigned long long)stats.missing_pts,
+    (unsigned long long)stats.event_start,
+    (unsigned long long)stats.event_caps,
+    (unsigned long long)stats.event_time,
+    (unsigned long long)stats.event_bytes,
+    (unsigned long long)stats.pcm_buffers,
+    (unsigned long long)stats.pcm_samples,
+    (unsigned long long)stats.pcm_nonzero,rms,peak,
+    stats.pcm_channels,stats.pcm_rate,
+    (unsigned long long)stats.s16_buffers,
+    (unsigned long long)stats.s32_buffers,
+    (unsigned long long)stats.f32_buffers,
+    (unsigned long long)stats.bad_maps,
+    (unsigned long long)stats.ignored_pcm,
+    (unsigned long long)stats.clipped);
+  pthread_mutex_unlock(&mu);
+  if(count<=0 || count>=(int)sizeof(json))return;
+  char tmp[240];
+  snprintf(tmp,sizeof(tmp),"%s.tmp",output_path);
+  int fd=open(tmp,O_CREAT|O_TRUNC|O_WRONLY|O_CLOEXEC|O_NOFOLLOW,0600);
+  if(fd<0)return;
+  ssize_t wrote=write(fd,json,count);
+  close(fd);
+  if(wrote!=count){unlink(tmp);return;}
+  if(rename(tmp,output_path))unlink(tmp);
+}
+static void *writer_thread(void *unused) {
+  (void)unused;
+  unsigned elapsed=0;
+  while(elapsed<R331_WINDOW_SECS && atomic_load(&enabled)) {
+    struct timespec delay={2,0};
+    nanosleep(&delay,NULL);
+    elapsed+=2;
+    if(elapsed>=R331_WINDOW_SECS)atomic_store(&enabled,0);
+    save_snapshot(elapsed);
+  }
+  atomic_store(&enabled,0);
+  save_snapshot(elapsed);
+  return NULL;
+}
+__attribute__((constructor))
+static void start_shim(void) {
+  const char *permit=getenv("ALEKS_R331_ENABLE");
+  if(!permit || strcmp(permit,"YES"))return;
+  qa_mode=getenv("ALEKS_R331_ISOLATED_QA") &&
+           !strcmp(getenv("ALEKS_R331_ISOLATED_QA"),"YES");
+  if(!qa_mode) {
+    char comm[80]={0};
+    FILE *f=fopen("/proc/self/comm","r");
+    if(f) {if(!fgets(comm,sizeof(comm),f))comm[0]=0;fclose(f);}
+    if(strncmp(comm,"starfish-media-",15))return;
+  }
+  const char *dir=qa_mode?getenv("ALEKS_R331_QA_DIR"):"/run/aleks-r331/metrics";
+  if(!dir)return;
+  if(qa_mode && (strncmp(dir,"/tmp/aleks-r331-",16) || strstr(dir,"..") || strlen(dir)>125))
+    return;
+  if(!qa_mode && strcmp(dir,"/run/aleks-r331/metrics"))return;
+  struct stat st;
+  if(stat(dir,&st)!=0 || !S_ISDIR(st.st_mode) || (st.st_mode&0077))return;
+  snprintf(output_path,sizeof(output_path),"%s/r331-%ld.json",dir,(long)getpid());
+  started_at=mono_seconds();
+  atomic_store(&enabled,1);
+  pthread_t thread;
+  if(pthread_create(&thread,NULL,writer_thread,NULL)==0) {
+    pthread_detach(thread);
+  } else atomic_store(&enabled,0);
+}
+__attribute__((destructor))
+static void stop_shim(void) {
+  if(!output_path[0])return;
+  atomic_store(&enabled,0);
+  save_snapshot((unsigned)(mono_seconds()-started_at));
+}
+
+GstFlowReturn gst_pad_push(GstPad *pad,GstBuffer *buffer) {
+  pthread_once(&resolve_once,resolve);
+  if(!a.push)return GST_FLOW_ERROR;
+  if(a.available && active()) {
+    if(peer_is_decoder(pad))record_input(buffer);
+    if(owned_by_decoder(pad))record_pcm(pad,buffer);
+  }
+  return a.push(pad,buffer);
+}
+gboolean gst_pad_push_event(GstPad *pad,GstEvent *event) {
+  pthread_once(&resolve_once,resolve);
+  if(!a.push_event)return FALSE;
+  if(a.available && active() && peer_is_decoder(pad))record_event(event);
+  return a.push_event(pad,event);
+}
