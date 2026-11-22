@@ -2,6 +2,8 @@
 
 **Date:** 2026-11-22. **Actual hardware probe: VERIFIED.** **Initial DTS cold-silent root cause: NOT VERIFIED.** **Production R278: UNCHANGED.**
 
+> **R327 correction after the real same-boot user-confirmed DTS silent → audible pair:** `pcm_output.monitor` returned **zero nonzero samples in BOTH states**, including when the owner explicitly heard DTS after AC3→DTS. The monitor therefore **does not represent the audible DTS signal for this route** and must NOT be used to localize the fault before PulseAudio or infer a silent decoder. The earlier zero measurement and prospective interpretation below are retained as historical diagnostics, **superseded for causal conclusions by [the verified R327 pair](R327_REAL_OWNER_DTS_SILENT_AUDIBLE_MONITOR_LIMITATION_20261122.md)**: 70,772 samples all zero while DTS silent, 67,810 all zero while DTS audible, same boot, 107 seconds apart; PulseAudio/ALSA stable states unchanged. **Cold-start DTS root cause remains unknown.**
+
 ## Why the R318 ALSA cursor comparisons were non-discriminating
 
 The owner has previously **confirmed** an actual Lampa cold first-DTS silence and an audible state after AC3→DTS on the same kitchen LG; see [R318](R318_REAL_KITCHEN_FIRST_SILENT_TO_AUDIBLE_PAIR_20261122.md). R318 reported identical ALSA PCM6 RUNNING/48kHz/cursor movement, one unmuted ADEC0→MAIN route, and 2 active streams in both stages, but **no sample amplitude was measured**. Do not mistake those counters for valid decoded DTS sound.
