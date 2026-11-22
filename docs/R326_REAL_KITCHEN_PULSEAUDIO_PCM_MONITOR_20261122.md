@@ -67,3 +67,11 @@ The key available **non-invasive** same-TV comparison is now:
 **Safety:** no TV reboot, restart, track switch, production plugin/registry/service/firmware/mixer/rootfs modification, permanent monitor process, microphone use, raw audio recording or playback control performed.
 
 **R326 PulseAudio input metadata & PCM output monitor: VERIFIED on physical TV. Real cold-DTS silent-vs-audible PCM pair: NOT YET CAPTURED. Permanent production DTS fix: NOT DEPLOYED.**
+
+## Final cleanup and CI verification
+
+- Physical kitchen cleanup task `a9fde0217ac4f4cd1b0976893ba3243e` **COMPLETED exit0** with `R326_TV_TMP_CLEAN_PASS`: both transient probe scripts were removed from LG `/tmp`.
+- Post-cleanup `umediaserver.service` was still **active**, and all four installed R278 library SHA256 values were rechecked against the official release (4/4 PASS). The existing `installed.env` and active `umediaserver.env` remained **byte-for-byte identical** (`R326_PRODUCTION_ENV_MATCH_PASS`).
+- VPS `STATE.md` updated with a verified backup `STATE.md.pre-r326-20261122`; no private PCM samples were saved.
+- [GitHub Actions R326 final run 45026748888](https://github.com/aerolit266/AlekS-DTS-webOS/actions/runs/45026748888), commit `2efa2a04fb08611b6573368c72e4e7a2f58044d5`, **completed/success**. Earlier CI run `5b6cc25d` successfully executed the newly added R326 read-only parser and synthetic PCM amplitude selftests.
+- **Hardware status remains:** the observed digital-zero interval was **UNCLASSIFIED**, not owner-verified DTS playback; the real R318 first-silent → audible PCM amplitude pair remains to be measured. No production update was installed.
