@@ -518,3 +518,28 @@ On Finnish VPS mediarus.com: initial independent C99 ASan/UBSan compile/run PASS
 - GStreamer plugin-scan `GST_REGISTRY_FORK=no` is scoped to the sandbox test process to ensure AddressSanitizer is initialized in the same sanitized process as the plugin; it does **not** change system GStreamer. ASan/UBSan error detection enabled; leak detection disabled because GLib/GStreamer process-global caches make leak checks unsuitable for this harness. Therefore no claim of full system leak-free status.
 
 **Interpretation and boundaries:** R188's real GstPad event handlers appear functional in these synthetic scenarios on GStreamer 1.24.2, so no R188 code changes were warranted. However this is an x86_64 userspace lab; kitchen LG webOS26 has a different media environment and uses **R278**, not the experimental R188 plugin. The original R188 owner-fixture QA remains BLOCKED due to the missing SHA-pinned original R122 and two DTS media fixtures. DTS decode/PCM sound and first-boot silent-vs-audible comparison on LG remain **NOT VERIFIED**. No change to installed DTS rank, decoder, production UMS, TV, firmware, or SSH.
+
+## R306 (2026-11-22): real DTS Core raw-chunk loss vs correctly packetized frames (FI VPS ONLY)
+
+**This is the first R30x test with genuine encoded DTS Core inputs, not synthetic DTS-looking headers.** On FI VPS FFmpeg's experimental DCA encoder generated a 2ch/48 kHz 440 Hz signal (144384 encoded bytes) and original multitone 5.1(side)/48 kHz (294912 bytes). FFprobe confirmed both real DTS. Two independent decoders in GStreamer, `dtsdec` and `avdec_dca`, plus FFmpeg decoded temporary PCM to disk; no speaker, LG, or movie content.
+
+### Key demonstrated differential
+
+With raw DTS supplied directly as arbitrary `filesrc` chunks into `dtsdec` (no packet framer installed on this VPS), PCM volume was **shorter and could vary between independent process launches**, despite exit status 0:
+
+| Test | 11-byte raw blocks (first / repeat) | 97-byte raw blocks (first / repeat) | 4096-byte raw blocks |
+| --- | ---: | ---: | ---: |
+| Stereo, PCM frames | 61952 / 61440 | 70656 / 70656 | **72192** |
+| 5.1, PCM frames | 64512 / 69632 | 72704 / 72704 | **73728** |
+
+**Same encoded DTS frames, losslessly remuxed into Matroska, fed through `matroskademux ! dtsdec`:** all block sizes 11/97/4096 and a repeated 11-byte run produced **byte-identical PCM** at the full counts **72192 stereo and 73728 surround**. GStreamer `matroskademux ! avdec_dca` separately reproduced both full frame counts; FFmpeg's independent decoder also gave those exact frame counts. Matroska packet counts were 141 stereo and 144 5.1. The full packetized decoder audio was nonzero on all channels, per-channel RMS matched the FFmpeg reference within 8%, and the first substantial decoded sample fell around frames 513–514 (LFE ~386). These ordinary short initial codec samples do not explain a user-observed prolonged silent session.
+
+**Interpretation:** in this **software lab**, arbitrary raw bytestream chunk boundaries at the compressed decoder input can result in missing PCM, whereas a proper upstream packet boundary-preserving demuxer removes that loss for the same DTS data. `dtsparse` was absent from this VPS; `matroskademux` supplied framed audio packets. This does **not prove** that the kitchen LG's native Starfish path or installed R278 receives improperly framed encoded data, nor that fragmented packet loss caused its initial silence. It does identify a concrete and now independently reproducible **candidate failure mechanism to check read-only on real LG** before patching any source.
+
+### Repeatable code and verification
+
+- Added [R306 end-to-end real DTS packet-boundary tester](../tools/test-real-dts-packet-boundaries-r306.py), final GitHub commit `92a9f1a8b170474f878d509179df5f9197a7fbc5`, SHA256 `129faf0b276df085e4e5e6f43fd99d64495e616d3be69538619d09c5def2ae24`. Stdlib Python creates the original tones and DTS frames using FFmpeg, verifies FFprobe codec+packet PTS/duration, compares three raw read sizes to three Matroska read sizes, checks actual PCM length, per-channel signal, independent FFmpeg/GStreamer decode, second GStreamer decoder and replay identity; prints all raw lost frames and rerun variability. Files kept only in a temporary directory.
+- Verified by independently downloading GitHub commit to FI VPS and running it: **`RESULT=R306_REAL_DTS_PACKET_BOUNDARY_QA_PASS; LIVE_LG_R278_UNTESTED`**. FFmpeg 6.1.1-3ubuntu5+esm15; GStreamer 1.24.2. Script SHA and numeric outputs verified. See [standalone R306 report](R306_REAL_DTS_PACKET_BOUNDARY_QA.md) for SHA256 of packetized PCM, frame counts and exact reproduction commands.
+- **No firmware/TV or production plugin changes, no new packages, no hardware audio output**. The old R188 owner-fixture QA remains blocked by missing original R122 and two DTS samples; R306 is a separately labeled, real-encoded-DTS lab lineage.
+
+**Next evidence needed:** On kitchen LG, safely record first DTS sample/PCM production and **how the media/demuxer passes packet/frame boundaries to installed R278** in a silent versus audible session, plus audio output allocation state, only through authorized read-only diagnostics without interrupting the user's playback. Do not blindly insert the experimental R188 framer, switch tracks, change plugin ranks or restart LG services based on the VPS result.
