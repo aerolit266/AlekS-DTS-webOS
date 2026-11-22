@@ -61,6 +61,20 @@ def main():
     main_pid = props.get("MainPID", "0")
     pid = int(main_pid) if main_pid.isdigit() else 0
     environ = read(Path("/proc") / str(pid) / "environ", 262144) if pid else None
+    preload = b""
+    for item in (environ or b"").split(b"\0"):
+        if item.startswith(b"LD_PRELOAD="):
+            preload = item.split(b"=", 1)[1]
+            break
+    # Only count/name safe shared libraries; don't log full paths or values.
+    candidates = re.split(rb"[\s:]+", preload)
+    preload_names = []
+    for item in candidates:
+        if not item:
+            continue
+        base = os.path.basename(item.decode("utf-8", "replace"))
+        preload_names.append(base if re.fullmatch(r"[A-Za-z0-9_.+-]{1,96}\.so(?:\.[0-9]+)*", base)
+                             else "UNCLASSIFIED")
     actual, installed = read(ENV), read(BACKUP)
     stat = ENV.stat() if actual is not None else None
     actual_sha = hashlib.sha256(actual).hexdigest() if actual is not None else ""
@@ -85,8 +99,12 @@ def main():
         "r278_plugin_path_in_env": ROOT_PLUGIN.encode() in (actual or b""),
         "live_service_has_gst_tracers_key": bool_env("GST_TRACERS", environ),
         "live_service_has_ld_preload_key": bool_env("LD_PRELOAD", environ),
+        "live_ld_preload_library_count": len(preload_names),
+        "live_ld_preload_safe_basenames": preload_names[:12],
+        "live_ld_preload_value_compatible": bool(preload) and b'"' not in preload and b"\n" not in preload,
         "live_service_has_gst_plugin_path_key": bool_env("GST_PLUGIN_PATH_1_0", environ),
         "native_tracer_libraries_present": plugins,
+        "systemd_run_available": os.path.isfile("/usr/bin/systemd-run") or os.path.isfile("/bin/systemd-run"),
         "secrets_or_env_values_recorded": False,
         "runtime_modified": False
     }
