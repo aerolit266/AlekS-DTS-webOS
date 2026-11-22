@@ -44,7 +44,7 @@ PLUGIN_SHA = {
     "fixtures/dts-51.mka":
         "7f9ed29c1ea9e6493d1977590a8506e432897f2eabd29ef2d7fc1ef48a4af6b5",
     "fixtures/ac3-51.mka":
-        "ab82bf91f6b61fc5a3cdf11ccd1e3bf3b4d91e2cc12089a88",
+        "ab82bf91f6b61fc5a3cdf11ccd1e3bf3b4d91e2a9b7667d97f87e2cc12089a88",
 }
 PUBLIC_DOCS = ("README.md", "README.en.md", "PUBLIC-COMPATIBILITY.md")
 
