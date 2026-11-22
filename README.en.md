@@ -2,9 +2,17 @@
 
 [Русский](README.md) · [Documentation license](LICENSE.md)
 
-> **R278: model-agnostic installer for compatible LG ARMv7 TVs.** No model, firmware-version or SDK allowlist. It checks native media dependencies and DTS/AC3 decoding before changing the media service configuration. [Installation](#installation)
+> **R278: verified ARM32 decoder libraries, not a universal binary patch for every LG.** The original archive's `install.sh` is restricted to **65NANO896PC / 03.60.96**. A separate [`install-universal.sh`](install-universal.sh) removes that exact model gate on compatible **ARMv7/GStreamer** devices, retaining decoder and media-service checks. webOS 26 requires a separately validated integration profile. Unknown models must be diagnosed first. [Installation](#installation).
 
 **AlekS DTS R277** adds DTS Core decoding to the native LG webOS media pipeline. Support loads automatically when the TV starts. For the tested DTS 5.1 track, the native audio sink received six-channel PCM S16LE at 48 kHz.
+
+## Current status — November 22, 2026
+
+- **Hall LG 65NANO896PC:** DTS Core 5.1 playback confirmed and released R278 plugin hashes verified.
+- **Kitchen LG, webOS 26:** R278 integration and 4/4 installed plugin SHA256 were verified on hardware; DTS works in Lampa, but the **first DTS selection after a full reboot is silent** until the user manually selects AC3 and returns to DTS. [R318 paired real-device evidence](docs/R318_REAL_KITCHEN_FIRST_SILENT_TO_AUDIBLE_PAIR_20261122.md). R320 confirmed nonzero PCM **in a separate decoder pipeline** on the same television, not inside the faulty Lampa path. **No permanent cold-start fix is released.**
+- **LG OLED77 B1 / webOS 6.3.2 (third-party report):** installation is unverified and an HDMI eARC receiver reportedly shows **PCM Stereo**; this does not establish DTS bitstream passthrough or six-channel PCM over eARC. [Troubleshooting](docs/R321_OLED77B1_EARC_INSTALL_TRIAGE_20261122.md).
+
+*Historical notes below preserve results at the time each test was performed; early “not tested” statements should not override later field evidence.*
 
 ## For other LG owners
 
@@ -30,7 +38,7 @@ DTS Core 2.0 and 5.1 also passed isolated tests. DTS-HD MA, DTS:X, DTS passthrou
 | LG 65NANO896PC · 03.60.96 · webOS TV 6.6.0 · ARMv7 · GStreamer 1.16.2 | DTS Core 5.1 verified on real hardware |
 | LG UP75006LF · ARMv7 · R278 | **Installation and DTS playback confirmed by owner:** `R278 configured`, isolated DTS 2.0 / DTS 5.1 / AC3 tests PASS, and owner reports everything working after installation. Separate Live TV regression results and persistence across multiple reboots are not documented |
 | Other LG ARMv7 TVs with native umediaserver / GStreamer | No model or firmware lock. The installer runs isolated DTS 2.0, DTS 5.1 and AC3 tests before enabling. Native-player playback still needs device-specific verification |
-| LG 43NANO85A6A · webOS 26 · 32-bit ARM media userland on ARM64 kernel · GStreamer 1.24.10 | **Isolated DTS 2.0/5.1 and software AC3 PASS**; native-player playback remains untested; candidate installation and immediate rollback both passed, without reboot. The original R278 installer must not be used; a dedicated frontend is required |
+| LG 43NANO85A6A · webOS 26 · 32-bit ARM media userland on ARM64 kernel · GStreamer 1.24.10 | **Lampa DTS and installed R278 integrity verified on hardware**; first DTS after reboot is silent until AC3→DTS (R318). Isolated stereo and 5.1 decoder PCM PASS (R320), but live Lampa first-start and eARC 5.1 remain unresolved. Original universal installer is incompatible; use only the reviewed per-device frontend |
 | 64-bit native media process / different CPU ABI | Requires a build matching the actual native media process ABI |
 | Different media pipeline/ABI, or modified media configuration | Installer must refuse before changing media-service configuration |
 
@@ -181,7 +189,7 @@ Open root SSH on an LG ARMv7 TV and paste the full block. It downloads the pinne
   trap 'rm -rf -- "$stage"' EXIT
   curl -fLsS --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 60 \
     -o "$stage/install-universal.sh" \
-    'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/main/install-universal.sh'
+    'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/9b4d9132ccdf8a7ee226ea292c8a0b3eae5d4859/install-universal.sh'
   printf '%s  %s\n' '9c3ce62eeadcd638968a72bd29b3aefbbe349425c0ef739c455ab50c61de3a48' "$stage/install-universal.sh" | sha256sum -c -
   sh "$stage/install-universal.sh" install
 )
