@@ -34,6 +34,8 @@ case "$*" in
 esac
 echo 'Got EOS from element "pipeline0".'
 if [ -e "$MOCK_MARKER" ];then exit 143;fi
+echo 'Setting pipeline to NULL ...'
+echo 'Freeing pipeline ...'
 exit 0
 LAUNCH
 # Do not inherit any externally supplied marker or mock-path value.
@@ -61,6 +63,8 @@ PATH="$work/mockbin:$PATH" sh "$work/r282-isolated.sh" > "$work/clean.out"
 [ "$(grep -c 'CLEAN_EXIT_AND_DECODE_PASS' "$work/clean.out")" -eq 4 ]
 grep -q '^R282_CLEAN_CASES=4/4 SIGTERM_EXIT_COUNT=0$' "$work/clean.out"
 grep -q '^RESULT=R282_ISOLATED_DECODEBIN3_AND_PCM_PROBE_PASS;' "$work/clean.out"
+[ "$(grep -c '^LIFECYCLE=.*pipeline_free_seen=yes' "$work/clean.out")" -eq 4 ]
+[ "$(grep -c '^LIFECYCLE=.*null_transition_seen=yes' "$work/clean.out")" -eq 4 ]
 echo 'R298_R282_EOS_EXIT0_FULL_PASS'
 # NEGATIVE control: log still claims EOS/PCM, but process returns 143.
 touch "$work/simulate-sigterm"
@@ -70,5 +74,7 @@ PATH="$work/mockbin:$PATH" sh "$work/r282-isolated.sh" > "$work/sigterm.out" || 
 [ "$(grep -c 'SIGTERM_EXIT_143' "$work/sigterm.out")" -eq 4 ]
 grep -q '^R282_CLEAN_CASES=0/4 SIGTERM_EXIT_COUNT=4$' "$work/sigterm.out"
 grep -q '^RESULT=R282_ISOLATED_DECODEBIN3_AND_PCM_PROBE_INCOMPLETE;' "$work/sigterm.out"
+[ "$(grep -c '^LIFECYCLE=.*pipeline_free_seen=no' "$work/sigterm.out")" -eq 4 ]
+[ "$(grep -c '^LIFECYCLE=.*deadline_compatible=no' "$work/sigterm.out")" -eq 4 ]
 echo 'R298_R282_EOS_EXIT143_REJECTED_PASS'
 echo 'RESULT=R298_OFFLINE_R282_STRICT_LIFECYCLE_QA_PASS; REAL_LG_NOT_TESTED'
