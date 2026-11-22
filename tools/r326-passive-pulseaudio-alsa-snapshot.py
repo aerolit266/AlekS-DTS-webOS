@@ -28,7 +28,7 @@ STATES = {"RUNNING", "IDLE", "SUSPENDED", "UNLINKED", "INIT"}
 KNOWN_COMM = {"pulseaudio", "audiooutputd", "audiod", "umediaserver", "alsa-sink-MARS", "starfish-media-"}
 SPEC = re.compile(r"^([a-z][a-z0-9-]{1,30})\s+(\d{1,2})ch\s+(\d{4,6})Hz$")
 PA_START = re.compile(r"^\s*(Sink Input|Sink) #(\d{1,6})\s*$")
-PA_LINE = re.compile(r"^\s*(Sink|Corked|Mute|Sample Specification|State|Buffer Latency|Sink Latency):\s*(.*?)\s*$")
+PA_LINE = re.compile(r"^\s*(Sink|Corked|Mute|Volume|Sample Specification|State|Buffer Latency|Sink Latency):\s*(.*?)\s*$")
 INT = re.compile(r"^\d{1,15}$")
 ALSA_POINTER = re.compile(r"^\s*(owner_pid|hw_ptr|appl_ptr|delay|avail)\s*:?\s*(\d{1,15})\s*$")
 
@@ -81,6 +81,12 @@ def parse_pa(text, wanted):
             block["sink_id"] = int(val)
         elif key in ("Corked", "Mute") and val.lower() in ("yes", "no"):
             block[key.lower()] = val.lower() == "yes"
+        elif key == "Volume":
+            pct = [int(value) for value in
+                   re.findall(r"/\\s*(\\d{1,3})%\\s*/", val)[:8]]
+            if pct and all(0 <= value <= 200 for value in pct):
+                block["volume_percent_min"] = min(pct)
+                block["volume_percent_max"] = max(pct)
         elif key == "State" and wanted == "Sink" and val in STATES:
             block["state"] = val
         elif key == "Sample Specification":
@@ -155,8 +161,10 @@ def pcm_hw_params():
     for name, val in re.findall(r"^\s*(format|channels|rate):\s*([^\n]+)", content, re.M):
         if name == "format" and val.strip() in {"S16_LE", "S32_LE"}:
             result[name] = val.strip()
-        elif name in ("channels", "rate") and INT.fullmatch(val.strip()):
-            result[name] = int(val.strip())
+        elif name in ("channels", "rate"):
+            numeric = re.match(r"^(\\d{1,15})(?:\\s|$)", val.strip())
+            if numeric:
+                result[name] = int(numeric.group(1))
     return result
 
 
@@ -271,13 +279,15 @@ def selftest():
   Sample Specification: s16le 2ch 48000Hz
   Corked: no
   Mute: no
+  Volume: front-left: 65536 / 100% / 0.00 dB, front-right: 65536 / 100% / 0.00 dB
   Buffer Latency: 32000 usec
   Sink Latency: 26096 usec
 """
     inputs = parse_pa(raw, "Sink Input")
     assert inputs == [{"id": 1, "sink_id": 1, "format": "s16le", "channels": 2,
                        "rate": 48000, "corked": False, "mute": False,
-                       "buffer_latency_us": 32000, "sink_latency_us": 26096}]
+                       "buffer_latency_us": 32000, "sink_latency_us": 26096,
+                       "volume_percent_min": 100, "volume_percent_max": 100}]
     bad = parse_pa("Sink Input #1\n Name: SECRET_PRIVATE_MOVIE\nSample Specification: s16le 2ch 48000Hz\n", "Sink Input")
     assert "SECRET_PRIVATE_MOVIE" not in json.dumps(bad)
     assert parse_pa(None, "Sink Input") is None
