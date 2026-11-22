@@ -22,6 +22,7 @@ typedef struct {
     const guint8 *expected;
     GstClockTime first_pts;
     gboolean failed;
+    gboolean reject_next;
 } Rig;
 static guint passed;
 
@@ -48,6 +49,11 @@ static void mkframe(guint8 *out,gsize n,guint ch,guint rate,guint samples) {
 static GstFlowReturn receive(GstPad *pad,GstObject *parent,GstBuffer *buffer) {
     (void)parent;
     Rig *r=g_object_get_data(G_OBJECT(pad),"rig");
+    if(r->reject_next) {
+        r->reject_next=FALSE;
+        gst_buffer_unref(buffer);
+        return GST_FLOW_NOT_NEGOTIATED;
+    }
     GstMapInfo map={0};
     if(!gst_buffer_map(buffer,&map,GST_MAP_READ)){
         r->failed=TRUE;
@@ -221,6 +227,56 @@ static void test_replay_after_eos(void) {
     R305_REQUIRE(r.received==1&&r.eos==2&&!r.failed,"reopen_same_element");
     destroy_rig(&r);check_case("REOPEN_AFTER_EOS_FLUSH_STREAM_START");
 }
+static void test_track_change(void) {
+    Rig r=create_rig();start_rig(&r);
+    guint8 *frames=g_malloc(1024+1116);
+    mkframe(frames,1024,2,48000,512);
+    mkframe(frames+1024,1116,6,44100,1024);
+    r.expected=frames;r.expected_len=1024+1116;r.first_pts=300000000ull;
+    R305_REQUIRE(send_start(&r,"r305-two-tracks"),"start_tracks");
+    R305_REQUIRE(sendbytes(&r,frames,1024,r.first_pts)==GST_FLOW_OK,"track_stereo");
+    R305_REQUIRE(sendbytes(&r,frames+1024,1116,900000000ull)==GST_FLOW_OK,"track_six");
+    R305_REQUIRE(gst_pad_push_event(r.up,gst_event_new_eos()),"eos_tracks");
+    R305_REQUIRE(r.received==2&&r.consumed==2140&&!r.failed,"both_frames");
+    R305_REQUIRE(r.metadata_caps>=2&&r.channels==6&&r.rate==44100,"caps_track_switch");
+    g_free(frames);
+    destroy_rig(&r);check_case("TRACK_CHANGE_RENEGOTIATES_CAPS");
+}
+static void test_invalid_sync_reset(void) {
+    Rig r=create_rig();start_rig(&r);
+    guint8 bad[11]={0};
+    guint8 frame[1024];mkframe(frame,sizeof(frame),2,48000,512);
+    R305_REQUIRE(send_start(&r,"r305-bad"),"start_bad");
+    R305_REQUIRE(sendbytes(&r,bad,sizeof(bad),100000000ull)==GST_FLOW_ERROR,"sync_error");
+    R305_REQUIRE(r.received==0,"no_bad_frame_forward");
+    R305_REQUIRE(gst_pad_push_event(r.up,gst_event_new_flush_start()),"invalid_flush_start");
+    R305_REQUIRE(gst_pad_push_event(r.up,gst_event_new_flush_stop(TRUE)),"invalid_flush_stop");
+    R305_REQUIRE(send_start(&r,"r305-reset-after-error"),"start_after_bad");
+    r.expected=frame;r.expected_len=sizeof(frame);r.first_pts=1500000000ull;
+    R305_REQUIRE(sendbytes(&r,frame,sizeof(frame),r.first_pts)==GST_FLOW_OK,"good_after_bad");
+    R305_REQUIRE(gst_pad_push_event(r.up,gst_event_new_eos()),"eos_after_bad");
+    R305_REQUIRE(r.received==1&&r.eos==1&&!r.failed,"recovered");
+    destroy_rig(&r);check_case("INVALID_SYNC_FAIL_CLOSED_RESET_RECOVERS");
+}
+static void test_downstream_reject(void) {
+    Rig r=create_rig();start_rig(&r);
+    guint8 frame[1024];mkframe(frame,sizeof(frame),2,48000,512);
+    r.expected=frame;r.expected_len=sizeof(frame);r.first_pts=300000000ull;
+    R305_REQUIRE(send_start(&r,"r305-sink-reject"),"start_reject");
+    r.reject_next=TRUE;
+    R305_REQUIRE(sendbytes(&r,frame,sizeof(frame),r.first_pts)==GST_FLOW_NOT_NEGOTIATED,
+                 "sink_flow_not_negotiated");
+    R305_REQUIRE(r.received==0&&!r.failed,"no_hidden_sink_recovery");
+    R305_REQUIRE(gst_pad_push_event(r.up,gst_event_new_flush_start()),"reject_flush_start");
+    R305_REQUIRE(gst_pad_push_event(r.up,gst_event_new_flush_stop(TRUE)),"reject_flush_stop");
+    R305_REQUIRE(send_start(&r,"r305-sink-reopen"),"start_reopen");
+    r.first_pts=1200000000ull;
+    R305_REQUIRE(sendbytes(&r,frame,sizeof(frame),r.first_pts)==GST_FLOW_OK,
+                 "sink_recovered");
+    R305_REQUIRE(gst_pad_push_event(r.up,gst_event_new_eos()),"eos_after_sink_reject");
+    R305_REQUIRE(r.received==1&&r.eos==1&&!r.failed,"sink_rejected_and_recovered");
+    destroy_rig(&r);check_case("DOWNSTREAM_REJECTION_PROPAGATES_AND_RESETS");
+}
 int main(int argc,char **argv) {
     R305_REQUIRE(argc==2,"plugin_arg");
     gst_init(&argc,&argv);
@@ -233,6 +289,9 @@ int main(int argc,char **argv) {
     test_stream_restart();
     test_reject_eos();
     test_replay_after_eos();
+    test_track_change();
+    test_invalid_sync_reset();
+    test_downstream_reject();
     g_print("RESULT=R305_GSTPAD_EVENTS_%u_OF_%u_PASS\n",passed,passed);
     g_print("SCOPE=EXPERIMENTAL_R188_WITH_SYNTHETIC_R122_NO_REAL_DTS_OR_LG\n");
     return 0;
