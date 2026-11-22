@@ -65,7 +65,8 @@ def source_to_pcm(root, name, path, channels, mode, block):
     size = out.stat().st_size
     if not size or size % (channels * 2):
         raise ValueError("PCM_MISALIGNED_OR_EMPTY")
-    digest = hashlib.file_digest(out.open("rb"), "sha256").hexdigest()
+    with out.open("rb") as handle:
+        digest = hashlib.file_digest(handle, "sha256").hexdigest()
     return {"frames": size // (channels * 2), "bytes": size,
             "sha256": digest}
 
