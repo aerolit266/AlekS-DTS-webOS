@@ -43,7 +43,6 @@ typedef gboolean (*PadPushEvent)(GstPad*,GstEvent*);
 typedef GstPad* (*PadGetPeer)(GstPad*);
 typedef GstElement* (*PadGetParent)(GstPad*);
 typedef GstElementFactory* (*ElementFactory)(GstElement*);
-typedef const gchar* (*FactoryName)(GstPluginFeature*);
 typedef void (*ObjUnref)(gpointer);
 typedef GstCaps* (*PadGetCaps)(GstPad*);
 typedef guint (*CapsSize)(const GstCaps*);
@@ -62,7 +61,6 @@ static struct {
   PadGetPeer get_peer;
   PadGetParent get_parent;
   ElementFactory get_factory;
-  FactoryName get_name;
   ObjUnref object_unref;
   PadGetCaps current_caps;
   CapsSize caps_size;
@@ -101,7 +99,6 @@ static void resolve(void) {
   RESOLVE(get_peer,"gst_pad_get_peer");
   RESOLVE(get_parent,"gst_pad_get_parent_element");
   RESOLVE(get_factory,"gst_element_get_factory");
-  RESOLVE(get_name,"gst_plugin_feature_get_name");
   RESOLVE(object_unref,"gst_object_unref");
   RESOLVE(current_caps,"gst_pad_get_current_caps");
   RESOLVE(caps_size,"gst_caps_get_size");
@@ -115,7 +112,7 @@ static void resolve(void) {
   RESOLVE(parse_segment,"gst_event_parse_segment");
 #undef RESOLVE
   a.available = a.push && a.push_event && a.get_peer && a.get_parent &&
-                a.get_factory && a.get_name && a.object_unref &&
+                a.get_factory && a.object_unref &&
                 a.current_caps && a.caps_size && a.caps_structure &&
                 a.structure_name && a.structure_string && a.structure_int &&
                 a.mini_unref && a.buffer_map && a.buffer_unmap &&
@@ -139,7 +136,8 @@ static int owned_by_decoder(GstPad *pad) {
   GstElement *elem=a.get_parent(pad);
   if(!elem) return 0;
   GstElementFactory *fact=a.get_factory(elem);
-  const gchar *name=fact ? a.get_name((GstPluginFeature*)fact) : NULL;
+  /* GstPluginFeature name is a GstObject field, not an exported\n     gst_plugin_feature_get_name function. Avoid failed dlsym gates. */
+  const gchar *name=fact ? GST_OBJECT_NAME(fact) : NULL;
   int match=name && (!strcmp(name,"aleksdts16dec") ||
                       (qa_mode && !strcmp(name,"dtsdec")));
   a.object_unref(elem);
