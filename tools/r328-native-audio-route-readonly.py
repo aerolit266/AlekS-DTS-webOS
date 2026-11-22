@@ -23,7 +23,7 @@ import subprocess
 import sys
 
 PROC = pathlib.Path("/proc")
-STATUS_RE = re.compile(r"^(state|owner_pid|hw_ptr|appl_ptr|delay|avail):?\s*(\S+)")
+STATUS_RE = re.compile(r"^(state|owner_pid|hw_ptr|appl_ptr|delay|avail)\s*:?\s*(\S+)")
 ALSA_DEVICE_ALLOWED = re.compile(r"^/dev/snd/(?:controlC[0-9]{1,2}|pcmC[0-9]{1,2}D[0-9]{1,2}[pc]|timer|seq)$")
 VALID_STATE = {"OPEN", "SETUP", "PREPARED", "RUNNING", "XRUN", "DRAINING", "PAUSED", "SUSPENDED", "DISCONNECTED"}
 KNOWN_PROC = ("starfish-media-", "audiooutputd", "umediaserver", "pulseaudio")
@@ -297,6 +297,8 @@ def selftest():
     assert ALSA_DEVICE_ALLOWED.fullmatch("/dev/snd/pcmC0D6p")
     assert ALSA_DEVICE_ALLOWED.fullmatch("/dev/snd/controlC1")
     assert not ALSA_DEVICE_ALLOWED.fullmatch("/dev/snd/../../../secret")
+    assert STATUS_RE.match("owner_pid : 1246").groups() == ("owner_pid", "1246")
+    assert STATUS_RE.match("hw_ptr : 512").groups() == ("hw_ptr", "512")
     assert pcm_status.__name__ == "pcm_status"
     print("RESULT=R328_NATIVE_ROUTE_SELFTEST_PASS")
 
