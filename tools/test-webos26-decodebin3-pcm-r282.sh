@@ -23,6 +23,9 @@ trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
 mkdir "$work/cache"
 printf '%s\n' '=== R282 DECODER PATH DIFFERENTIAL (NO LIVE AUDIO) ==='
+cases_total=0
+cases_pass=0
+cases_signaled=0
 
 run() {
   ranks=$1; shift
@@ -68,6 +71,25 @@ for mode in db3_stock db3_lg db3_aleks db3_aleks_pcm2; do
   if grep -Eiq 'not-negotiated|not-linked|Internal data stream error' "$logfile"; then failed_caps=yes; else failed_caps=no; fi
   printf 'CASE=%s ranks=%s exit=%s DTS_DECODER=%s EOS=%s PCM6=%s PCM_S32LE=%s PCM2=%s NEGOTIATION_ERROR=%s\n' \
     "$mode" "$ranks" "$code" "$decoder" "$eos" "$pcm6" "$s32" "$stereo" "$failed_caps"
+  cases_total=$((cases_total+1))
+  expected_pcm=no
+  if [ "$mode" = db3_aleks_pcm2 ]; then
+    [ "$stereo" = yes ] && [ "$s32" = yes ] && expected_pcm=yes
+  else
+    [ "$pcm6" = yes ] && expected_pcm=yes
+  fi
+  if [ "$code" -eq 0 ] && [ "$decoder" = yes ] && [ "$eos" = yes ] &&
+     [ "$failed_caps" = no ] && [ "$expected_pcm" = yes ]; then
+    cases_pass=$((cases_pass+1))
+    echo "CASE_VERDICT=$mode CLEAN_EXIT_AND_DECODE_PASS"
+  elif [ "$code" -eq 143 ]; then
+    cases_signaled=$((cases_signaled+1))
+    echo "CASE_VERDICT=$mode SIGTERM_EXIT_143; EOS_ONLY_DOES_NOT_PROVE_CLEAN_TEARDOWN"
+  elif [ "$code" -eq 124 ]; then
+    echo "CASE_VERDICT=$mode TIMEOUT_EXIT_124; CHECK_LG_TIMEOUT_SEMANTICS"
+  else
+    echo "CASE_VERDICT=$mode NOT_PASS; EXIT_OR_DECODE_OR_CAPS_MISMATCH"
+  fi
 done
 printf '%s\n' '=== SELECTED LG SINK FACTORY TEMPLATES (NO INSTANTIATION) ==='
 for elem in tsinkbin tsink audiosink alsasink pulsesink; do
@@ -75,4 +97,11 @@ for elem in tsinkbin tsink audiosink alsasink pulsesink; do
   printf 'ELEMENT=%s\n' "$elem"
   printf '%s\n' "$details" | grep -Ei 'Rank|audio/x-raw|format:|channels:|S16LE|S32LE|F32LE' | head -n 18 || :
 done
-echo 'RESULT=R282_ISOLATED_DECODEBIN3_AND_PCM_PROBE_COMPLETE; NATIVE_SOUND_UNTESTED'
+printf 'R282_CLEAN_CASES=%s/%s SIGTERM_EXIT_COUNT=%s\n' "$cases_pass" "$cases_total" "$cases_signaled"
+if [ "$cases_total" -eq 4 ] && [ "$cases_pass" -eq 4 ]; then
+  echo 'RESULT=R282_ISOLATED_DECODEBIN3_AND_PCM_PROBE_PASS; NATIVE_SOUND_UNTESTED'
+else
+  echo 'RESULT=R282_ISOLATED_DECODEBIN3_AND_PCM_PROBE_INCOMPLETE; NATIVE_SOUND_UNTESTED'
+  echo 'NOTE=EOS is a bus event, not process exit. Exit 143 is SIGTERM; its exact source is not established.'
+  exit 1
+fi
