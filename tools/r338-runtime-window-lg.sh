@@ -16,7 +16,7 @@ DROP_DIR=/run/systemd/system/umediaserver.service.d
 DROP=$DROP_DIR/99-aleks-r338.conf
 MARK='# AlekS R338 runtime-only observer 20261123'
 EXPECTED_ENV=654530c165e1f8229b9326c020ec5654da3e8b47e0425182d011c210c3e45497
-EXPECTED_HOOK=2e460188129b3cf946a10b66f21c2dcc6adb1994d35ab8faf9b3d0576d94f595
+EXPECTED_HOOK=45ba5af2e437b94d43c2902fd7471dc852ae8fa285ff01502a16197bbf799dd1
 
 die() { echo "RESULT=R338_ABORT_$1";exit 2; }
 verify_sha() {
@@ -59,8 +59,9 @@ preflight() {
   [ -z "$(systemctl show umediaserver.service -p DropInPaths --value)" ] || die EXISTING_OTHER_DROPIN
   [ ! -e "$DROP" ] || die ALREADY_INSTALLED
   [ ! -e "$ROOT" ] || die R338_ALREADY_STAGED
-  [ "$(systemctl is-active aleks-r338-rollback.timer 2>/dev/null || :)" != active ] || die TIMER_ALREADY_ARMED
+  [ "$(systemctl is-active aleks-r338b-rollback.timer 2>/dev/null || :)" != active ] || die TIMER_ALREADY_ARMED
   [ "$(systemctl is-active aleks-r331-rollback.timer 2>/dev/null || :)" != active ] || die PRIOR_TIMER_ACTIVE
+  [ "$(systemctl is-active aleks-r338-rollback.timer 2>/dev/null || :)" != active ] || die PRIOR_R338_TIMER_ACTIVE
   verify_sha "$EXPECTED_HOOK" "$STAGE"
   read_original_preload
   echo RESULT=R338_PREFLIGHT_PASS
@@ -124,10 +125,10 @@ arm() {
     *) rm -f "$DROP";systemctl daemon-reload || :;die OVERLAY_ENV_NOT_REGISTERED ;;
   esac
   # The watchdog is owned by systemd PID1, independent of the SSH/MCP session.
-  if ! systemd-run --unit=aleks-r338-rollback --on-active=140s /bin/sh "$ROOT/controller.sh" rollback; then
+  if ! systemd-run --unit=aleks-r338b-rollback --on-active=140s /bin/sh "$ROOT/controller.sh" rollback; then
     rm -f "$DROP";systemctl daemon-reload || :;die WATCHDOG_NOT_CREATED
   fi
-  [ "$(systemctl is-active aleks-r338-rollback.timer)" = active ] ||
+  [ "$(systemctl is-active aleks-r338b-rollback.timer)" = active ] ||
     { rm -f "$DROP";systemctl daemon-reload || :;die WATCHDOG_NOT_ACTIVE; }
   echo R338_WATCHDOG_BEFORE_RESTART=VERIFIED
   if ! timeout 26 systemctl restart umediaserver.service;then
@@ -186,7 +187,7 @@ status() {
   else echo R338_OVERRIDE=ABSENT; fi
   echo R338_MEDIA_SERVICE=$(systemctl is-active umediaserver.service 2>/dev/null || :)
   echo R338_AUDIO_SERVICE=$(systemctl is-active audiooutputd.service 2>/dev/null || :)
-  echo R338_TIMER=$(systemctl is-active aleks-r338-rollback.timer 2>/dev/null || :)
+  echo R338_TIMER=$(systemctl is-active aleks-r338b-rollback.timer 2>/dev/null || :)
   if [ -d "$ROOT/metrics" ];then
     echo R338_METRIC_COUNT=$(find "$ROOT/metrics" -maxdepth 1 -name 'r338-*.json' | wc -l)
   else echo R338_METRIC_COUNT=0; fi
