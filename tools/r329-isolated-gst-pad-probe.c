@@ -156,7 +156,7 @@ static GstPadProbeReturn inspect_pcm(GstPad *pad, GstPadProbeInfo *info,
     return GST_PAD_PROBE_OK;
 }
 
-static void print_result(const R329Stats *s, gboolean done, gint exit_code) {
+static void print_result(const R329Stats *s, gboolean done, gint native, gint wrapper, gint exit_code) {
     gdouble rms = s->pcm_samples ?
         sqrt(s->pcm_squared_sum / (gdouble)s->pcm_samples) : 0.0;
     gdouble dbfs = rms > 0 ? 20.0 * log10(rms / 32768.0) : -999.0;
@@ -184,14 +184,18 @@ static void print_result(const R329Stats *s, gboolean done, gint exit_code) {
     printf("R329_AUDIO_FILES_CREATED=0\n");
     printf("R329_RAW_PCM_EXPORTED=NO\n");
     printf("R329_CONNECTED_TO_LIVE_MEDIA=NO\n");
+    printf("R329_NATIVE_MODE=%s\n", native ? "YES" : "NO");
+    printf("R329_R278_LOADED=%s\n", wrapper ? "YES" : "NO");
     printf("RESULT=%s\n", exit_code == 0 ? "R329_PAD_PROBE_PASS" : "R329_PAD_PROBE_FAIL");
 }
 
 int main(int argc, char **argv) {
-    if (argc != 5) {
-        fputs("R329_USAGE: r329-probe <stereo|surround> <matroska|raw> <fixture> <blocksize>\n", stderr);
+    if (argc != 5 && argc != 6) {
+        fputs("R329_USAGE: r329-probe <stereo|surround> <matroska|raw> <fixture> <blocksize> [native-r278]\n", stderr);
         return 2;
     }
+    gboolean native = argc == 6;
+    if (native && strcmp(argv[5], "native-r278") != 0) return 2;
     gboolean surround = strcmp(argv[1], "surround") == 0;
     if (!surround && strcmp(argv[1], "stereo") != 0) return 2;
     gboolean raw = strcmp(argv[2], "raw") == 0;
@@ -204,21 +208,26 @@ int main(int argc, char **argv) {
     name = name ? name + 1 : argv[3];
     const char *allowed = surround ? (raw ? "surround.dts" : "surround.mka")
                                   : (raw ? "stereo.dts" : "stereo.mka");
-    if (strcmp(name, allowed) != 0) return 2;
+    if (strcmp(name, allowed) != 0 ||
+        !g_str_has_prefix(argv[3], "/tmp/aleks-r329-")) return 2;
+    for (const char *c = argv[3]; *c; c++) {
+        if (!(g_ascii_isalnum(*c) || *c == '/' || *c == '_' ||
+              *c == '-' || *c == '.')) return 2;
+    }
     gst_init(&argc, &argv);
     gchar *spec = raw ?
         g_strdup_printf(
             "filesrc location=\"%s\" blocksize=%u ! "
-            "audio/x-dts ! aleksdtsr188framer ! queue ! dtsdec name=decoder ! "
+            "audio/x-dts ! aleksdtsr188framer ! queue ! %s name=decoder ! "
             "audioconvert ! audio/x-raw,format=S16LE,channels=%u,rate=48000 ! "
             "identity name=pcm_monitor ! fakesink sync=false",
-            argv[3], block, surround ? 6U : 2U) :
+            argv[3], block, native ? "decodebin" : "dtsdec", surround ? 6U : 2U) :
         g_strdup_printf(
             "filesrc location=\"%s\" ! matroskademux name=dm "
-            "dm.audio_0 ! queue ! dtsdec name=decoder ! "
+            "dm.audio_0 ! queue ! %s name=decoder ! "
             "audioconvert ! audio/x-raw,format=S16LE,channels=%u,rate=48000 ! "
             "identity name=pcm_monitor ! fakesink sync=false",
-            argv[3], surround ? 6U : 2U);
+            argv[3], native ? "decodebin" : "dtsdec", surround ? 6U : 2U);
     GError *err = NULL;
     GstElement *pipe = gst_parse_launch(spec, &err);
     g_free(spec);
@@ -261,6 +270,22 @@ int main(int argc, char **argv) {
             gst_message_unref(msg);
         }
     }
+    gboolean wrapper_found = FALSE;
+    if (native) {
+        /* This ONLY inspects libraries mapped in the instrument's own
+           isolated process; it never inspects or attaches to Starfish. */
+        FILE *map = fopen("/proc/self/maps", "r");
+        if (map) {
+            char line[2048];
+            while (fgets(line, sizeof(line), map)) {
+                if (strstr(line, "/aleks-dts-r278/plugins/libgstaleksdts16dec.so")) {
+                    wrapper_found = TRUE;
+                    break;
+                }
+            }
+            fclose(map);
+        }
+    }
     gst_element_set_state(pipe, GST_STATE_NULL);
     int ok = eos && !error_event && stats.stream_events > 0 &&
         stats.caps_dts > 0 && stats.segment_time > 0 &&
@@ -271,8 +296,8 @@ int main(int argc, char **argv) {
         stats.pcm_s16 && stats.pcm_rate == 48000 &&
         stats.pcm_channels == stats.expected_channels &&
         stats.pcm_samples == (guint64)94 * 512 * stats.expected_channels &&
-        stats.pcm_nonzero > 0;
-    print_result(&stats, eos, ok ? 0 : 1);
+        stats.pcm_nonzero > 0 && (!native || wrapper_found);
+    print_result(&stats, eos, native, wrapper_found, ok ? 0 : 1);
     gst_object_unref(bus);
     gst_object_unref(encoded);
     gst_object_unref(decoded);
