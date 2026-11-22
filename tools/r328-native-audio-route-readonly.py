@@ -24,7 +24,7 @@ import sys
 
 PROC = pathlib.Path("/proc")
 STATUS_RE = re.compile(r"^(state|owner_pid|hw_ptr|appl_ptr|delay|avail):?\s*(\S+)")
-ALSA_NODE_RE = re.compile(r"^card([0-9]{1,2})/pcm([0-9]{1,2})p/sub([0-9]{1,2})$")
+ALSA_DEVICE_ALLOWED = re.compile(r"^/dev/snd/(?:controlC[0-9]{1,2}|pcmC[0-9]{1,2}D[0-9]{1,2}[pc]|timer|seq)$")
 VALID_STATE = {"OPEN", "SETUP", "PREPARED", "RUNNING", "XRUN", "DRAINING", "PAUSED", "SUSPENDED", "DISCONNECTED"}
 KNOWN_PROC = ("starfish-media-", "audiooutputd", "umediaserver", "pulseaudio")
 PLUGIN_DIR = "/var/lib/webosbrew/aleks-dts-r278/plugins/"
@@ -156,6 +156,7 @@ def sanitized_ls2(query):
 
 def metadata_fds(proc_dir):
     totals = {"alsa_device": 0, "socket": 0, "other": 0}
+    alsa_nodes = set()
     try:
         children = list((proc_dir / "fd").iterdir())[:256]
     except OSError:
@@ -167,17 +168,22 @@ def metadata_fds(proc_dir):
             continue
         if dest.startswith("/dev/snd/"):
             totals["alsa_device"] += 1
+            if ALSA_DEVICE_ALLOWED.fullmatch(dest):
+                alsa_nodes.add(dest.rsplit("/", 1)[-1])
+            else:
+                alsa_nodes.add("OTHER_SND_NODE")
         elif dest.startswith("socket:"):
             totals["socket"] += 1
         else:
             totals["other"] += 1
-    return {"available": True, "counts": totals}
+    return {"available": True, "counts": totals,
+            "alsa_nodes": sorted(alsa_nodes)}
 
 
 def processes():
     counts = {k: 0 for k in KNOWN_PROC}
     holders = 0
-    devices = {k: {"alsa_device": 0, "fd_probe_available": 0} for k in KNOWN_PROC}
+    devices = {k: {"alsa_device": 0, "fd_probe_available": 0, "alsa_nodes": []} for k in KNOWN_PROC}
     mappings = {k: {"libasound_mapped": 0, "libpulse_mapped": 0,
                     "libgst_mapped": 0} for k in KNOWN_PROC}
     try:
@@ -202,6 +208,8 @@ def processes():
         if fd["available"]:
             devices[comm]["fd_probe_available"] += 1
             devices[comm]["alsa_device"] += fd["counts"]["alsa_device"]
+            devices[comm]["alsa_nodes"] = sorted(set(devices[comm]["alsa_nodes"])
+                                                    | set(fd["alsa_nodes"]))
     return {"available": True, "counts": counts, "r278_wrapper_processes": holders,
             "alsa_fds": devices, "library_maps": mappings}
 
@@ -286,6 +294,9 @@ def selftest():
     assert got["stream"]["streams"] == 2
     assert "secret" not in json.dumps(got).lower()
     assert "url" not in json.dumps(got).lower()
+    assert ALSA_DEVICE_ALLOWED.fullmatch("/dev/snd/pcmC0D6p")
+    assert ALSA_DEVICE_ALLOWED.fullmatch("/dev/snd/controlC1")
+    assert not ALSA_DEVICE_ALLOWED.fullmatch("/dev/snd/../../../secret")
     assert pcm_status.__name__ == "pcm_status"
     print("RESULT=R328_NATIVE_ROUTE_SELFTEST_PASS")
 
