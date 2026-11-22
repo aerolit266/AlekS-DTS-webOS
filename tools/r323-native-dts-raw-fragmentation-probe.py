@@ -123,8 +123,21 @@ def main():
         if code or not raw.is_file() or not 1000 < raw.stat().st_size < 200000:
             raise ValueError("DEMUX_RAW_PREP_FAILED")
         print("R323_ENCODED_DTS_BYTES=" + str(raw.stat().st_size))
+        # DTS Core stereo fixture from R278 is split at 1024-byte boundaries
+        # (confirmed using public sync bytes only, no private media).
+        encoded = raw.read_bytes()
+        expected_sync = bytes.fromhex("7ffe8001")
+        frame_size = 1024
+        frame_count, remainder = divmod(len(encoded), frame_size)
+        valid_syncs = sum(encoded[i:i+4] == expected_sync
+                          for i in range(0, len(encoded), frame_size))
+        print("R323_EXPECTED_FRAME_SIZE=" + str(frame_size))
+        print("R323_FRAME_BOUNDARY_COUNT=" + str(frame_count))
+        print("R323_FRAME_SYNC_MATCHES=" + str(valid_syncs))
+        if remainder != 0 or valid_syncs != frame_count:
+            raise ValueError("REFERENCE_DTS_FRAME_SYNC_MISMATCH")
         print("R323_NOTE=RAW_TESTS_ARE_ISOLATED_DIFFERENTIAL_NOT_LAMPA")
-        for block in (11, 97, 4096):
+        for block in (11, 97, 512, 1024, 2048, 4096):
             src = ["filesrc", "blocksize=" + str(block),
                    "location=" + str(raw), "!", "audio/x-dts"]
             test_decoder("RAW_" + str(block), src, env)
