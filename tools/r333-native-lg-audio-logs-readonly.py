@@ -16,6 +16,7 @@ ROOT = Path("/tmp/var/log")
 FILES = ("bootd.log", "initctl.log", "dbg-log", "legacy-log",
          "legacy-log.0.gz", "legacy-log.1.gz", "legacy-log.2.gz",
          "legacy-log.3.gz", "legacy-log.4.gz", "rtd_acpu1.log",
+         "rtd_vcpu1.log", "rtd_vcpu2.log",
          "rtd_kcpu1.log", "rtd_logfile.log")
 MAX_UNCOMPRESSED_PER_FILE = 5_000_000
 MAX_LINES = 250000
@@ -30,14 +31,15 @@ PATTERNS = {
     "PROBLEM": re.compile(rb"\bfail(?:ed|ure)?\b|\berror\b|timeout|underrun|crash|hang|fatal|segfault|not.ready", re.I),
     "FLUSH": re.compile(rb"\bflush\b|\bseek\b|stream.?start", re.I),
 }
-CLOCK = re.compile(rb"\b([012]?\d):([0-5]\d):([0-5]\d)(?:\.\d+)?\b")
+ISO_UTC = re.compile(rb"2026-11-22T([012]\d):([0-5]\d):([0-5]\d)")
 
 
 def window(hh: int, mm: int) -> str:
-    if hh == 22 and 35 <= mm <= 45:
-        return "COLD_BOOT_AND_SILENT_2235_2245"
-    if hh == 22 and 46 <= mm <= 54:
-        return "AC3_DTS_RECOVERY_2246_2254"
+    # Timestamps in native legacy-log are UTC, unlike LG ls -l output.
+    if hh == 15 and 35 <= mm <= 45:
+        return "COLD_BOOT_AND_SILENT_1535_1545_UTC"
+    if hh == 15 and 46 <= mm <= 54:
+        return "AC3_DTS_RECOVERY_1546_1554_UTC"
     return "OTHER_TIME"
 
 
@@ -46,6 +48,8 @@ def scan() -> dict:
     result = {}
     windows = defaultdict(Counter)
     strong = []
+    minute_tags = defaultdict(Counter)
+    seen_per_window = Counter()
     for filename in FILES:
         path = ROOT / filename
         if not path.is_file() or path.is_symlink():
@@ -70,26 +74,30 @@ def scan() -> dict:
                         continue
                     matching += 1
                     counts.update(tags)
-                    stamp = CLOCK.search(line[:220])
+                    stamp = ISO_UTC.search(line[:160])
                     if stamp:
                         hh, mm, ss = (int(x) for x in stamp.groups())
-                        if hh <= 23:
-                            when = window(hh, mm)
-                            windows[when].update(tags)
-                            times[f"{hh:02}:{mm:02}"] += 1
-                            # Only technical event labels and numeric time are exported.
-                            if len(strong) < 65 and (
-                                ("DTS" in tags and len(tags) > 1)
-                                or ("RESOURCE" in tags and "PROBLEM" in tags)
-                                or ("DSP" in tags and "PROBLEM" in tags)
-                            ):
-                                strong.append({
-                                    "source": filename,
-                                    "clock": f"{hh:02}:{mm:02}:{ss:02}",
-                                    "tags": list(tags),
-                                })
+                        when = window(hh, mm)
+                        windows[when].update(tags)
+                        minute = f"{hh:02}:{mm:02}"
+                        times[minute] += 1
+                        minute_tags[minute].update(tags)
+                        salient = (
+                            ("DTS" in tags and len(tags) > 1)
+                            or ("AC3" in tags and "DECODER" in tags)
+                            or ("RESOURCE" in tags and "PROBLEM" in tags)
+                            or ("DSP" in tags and "PROBLEM" in tags)
+                            or ("AUDIO_ROUTE" in tags and "PROBLEM" in tags)
+                            or ("FLUSH" in tags and "DECODER" in tags)
+                        )
+                        if salient and seen_per_window[when] < 45:
+                            strong.append({
+                                "source": filename, "clock": f"{hh:02}:{mm:02}:{ss:02}",
+                                "tags": list(tags),
+                            })
+                            seen_per_window[when] += 1
                     else:
-                        windows["NO_CLOCK"].update(tags)
+                        windows["NO_ABSOLUTE_UTC_CLOCK"].update(tags)
         except (OSError, EOFError, gzip.BadGzipFile):
             result[filename] = {"status": "ERROR"}
             continue
@@ -105,7 +113,8 @@ def scan() -> dict:
         "schema": "aleks-dts-r333-redacted-native-logs-v1",
         "files": result,
         "window_tag_counts": {k: dict(v) for k, v in windows.items()},
-        "strong_event_time_and_tags": strong,
+        "strong_event_time_and_tags": sorted(strong, key=lambda x:x["clock"]),
+        "minute_tag_counts": {k: dict(v) for k,v in sorted(minute_tags.items())},
         "no_raw_logs_exported": True,
         "audio_recorded": False,
         "service_modified": False,
