@@ -352,7 +352,7 @@ Added [tools/test-r295-r296-offline-r297.sh](../tools/test-r295-r296-offline-r29
 
 `josippapez/dts_restore_plus` [upstream README troubleshooting](https://github.com/josippapez/dts_restore_plus#troubleshooting) documents that on some older LG webOS models DTS/audio detection may fail on the first play after boot and work after **closing and replaying** the video. This matches the *form* of the kitchen owner's intermittent initial silence followed by success after AC3→DTS and a full player relaunch. **It is not proof that the native failure mode is the same**, nor that a plugin priority increase or a forced AC3 track switch would correct it. Its compatibility targets differ from kitchen webOS26.
 
-Historical separate hall-TV work [R213/R215](/) measured an ~8.0-second **Starfish playback lifecycle** excess for DTS5.1 vs AC3 and AudioD `pcm/channel=-1` vs `ac3/channel=6` in tests on **another LG**, with standalone decoded EOS normal. This is a possible component to include in future investigation, not verified on kitchen; application PLAY→PAUSE timing is not Gst EOS timing, and `channel=-1` cannot independently establish silence.
+Historical separate hall-TV lab work R213/R215 measured an ~8.0-second **Starfish playback lifecycle** excess for DTS5.1 vs AC3 and AudioD `pcm/channel=-1` vs `ac3/channel=6` in tests on **another LG**, with standalone decoded EOS normal. This is a possible component to include in future investigation, not verified on kitchen; application PLAY→PAUSE timing is not Gst EOS timing, and `channel=-1` cannot independently establish silence.
 
 ### Current release gate
 
