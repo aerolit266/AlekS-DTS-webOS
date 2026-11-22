@@ -82,3 +82,28 @@ jobs:
               ast.parse(Path(path).read_text())
           print("RESULT=R335_R336_SOURCE_INTEGRITY_PASS")
           PY
+      - name: Safeguard R337 passive Realtek sink observer and native QA
+        run: |
+          sh -n tools/r337-verify-realtek-sink-observer-lg.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path("tools/r337-bounded-realtek-sink-observer.c").read_text()
+          qa = Path("tools/r337-verify-realtek-sink-observer-lg.sh").read_text()
+          for marker in (
+              "rtkalsasink", "rasink", "qa_fakesink",
+              "renderer_scope", "MAX_PCM_PER_BUFFER 1024U",
+              "ALEKS_R337_ENABLE", "ALEKS_R337_ISOLATED_QA",
+              "R337_WINDOW_SECS 180", "external_process_attached",
+              "raw_pcm_exported", "raw_media_exported",
+          ):
+              assert marker in src, marker
+          for marker in (
+              "fakesink sync=false", "R337_LG_ISOLATED_REAL_R278_SINK_2_OF_2_PASS",
+              "sha256sum -c -", "systemctl is-active",
+              "audio_files_created",
+          ):
+              assert marker in qa, marker
+          assert "! rtkalsasink" not in qa
+          assert "! rasink" not in qa
+          print("RESULT=R337_OBSERVER_FAIL_CLOSED_CI_CONTRACT_PASS")
+          PY
