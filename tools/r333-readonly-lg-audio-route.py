@@ -17,28 +17,34 @@ import time
 from typing import Any
 
 QUERIES = (
-    ("audiooutput", "luna://com.webos.service.audiooutput/audio/getStatus"),
-    ("avoutput", "luna://com.webos.service.avoutput/audio/getStatus"),
-    ("audio", "luna://com.webos.service.audio/getSoundOutput"),
-    ("tv_audio", "luna://com.webos.audio/getStatus"),
+    ("audiooutput", "luna://com.webos.service.audiooutput/audio/getStatus", {}),
+    ("avoutput", "luna://com.webos.service.avoutput/audio/getStatus", {}),
+    ("audio", "luna://com.webos.service.audio/getSoundOutput", {}),
+    ("tv_audio", "luna://com.webos.audio/getStatus", {}),
+    ("stream_policy", "luna://com.webos.service.audio/getStreamStatus", {}),
+    ("source_policy", "luna://com.webos.service.audio/getSourceStatus", {}),
+    ("master_volume", "luna://com.webos.service.audio/master/getVolume", {}),
 )
 ALLOWED = {
     "source", "sink", "sourcePort", "outputMode", "muted", "soundOutput",
     "soundOut", "audioType", "volume", "input_codec", "output_codec",
     "returnValue", "errorCode", "inputSource", "inputCodec", "outputCodec",
     "sound_output", "input_source", "audioDirection", "isMuted",
+    "streamObject", "sourceObject", "volumeStatus", "inputVolume",
+    "activeStatus", "muteStatus", "policyStatus", "streamType",
+    "sourceType", "sessionId", "subscribed",
 }
 MAX_READ = 20000
 TIMEOUT_SECONDS = 4.0
 
 
-def invoke_getter(uri: str) -> str:
+def invoke_getter(uri: str, payload: dict) -> str:
     master, slave = pty.openpty()
     proc = None
     output = bytearray()
     try:
         proc = subprocess.Popen(
-            ["luna-send", "-n", "1", "-f", uri, "{}"],
+            ["luna-send", "-n", "1", "-f", uri, json.dumps(payload, separators=(",", ":"))],
             stdin=slave, stdout=slave, stderr=slave,
             close_fds=True, start_new_session=True,
         )
@@ -104,8 +110,11 @@ def redact(obj: Any, depth: int = 0) -> Any:
         return None
     out = {}
     for key, val in obj.items():
-        if key == "audio" and isinstance(val, list):
-            out["audio"] = [redact(x, depth + 1) for x in val[:16]]
+        if key in ("audio", "streamObject", "sourceObject") and isinstance(val, list):
+            out[key] = [redact(x, depth + 1) for x in val[:16]]
+            continue
+        if key == "volumeStatus" and isinstance(val, dict):
+            out[key] = redact(val, depth + 1)
             continue
         if key not in ALLOWED:
             continue
@@ -125,9 +134,9 @@ def main() -> int:
         print("RESULT=R333_USAGE")
         return 2
     summaries = {}
-    for name, uri in QUERIES:
+    for name, uri, payload in QUERIES:
         try:
-            replies = parse_objects(invoke_getter(uri))
+            replies = parse_objects(invoke_getter(uri, payload))
         except (OSError, ValueError, subprocess.SubprocessError):
             summaries[name] = {"status": "UNAVAILABLE"}
             continue
