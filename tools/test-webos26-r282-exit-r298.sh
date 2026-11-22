@@ -109,4 +109,43 @@ R300_TIMEOUT_SIGNAL=INVALID PATH="$work/mockbin:$PATH" sh "$work/r282-isolated.s
 [ "$rc" -eq 2 ]
 grep -q 'BLOCKED: unsupported R300_TIMEOUT_SIGNAL=INVALID' "$work/invalid.out"
 echo 'R300_INVALID_SIGNAL_BLOCKED_PASS'
+# R301: validate actual R282 console output, not just constructed dictionaries.
+analyzer="$here/analyze-webos26-dts-lifecycle-r301.py"
+[ -r "$analyzer" ] || { echo 'R301_MISSING_ANALYZER'; exit 2; }
+python3 -B "$analyzer" "$work/clean.out" --strict > "$work/r301-clean.json"
+python3 -B - "$work/r301-clean.json" <<'R301GOOD'
+import json, sys
+x=json.load(open(sys.argv[1], encoding="utf-8"))
+assert x["r301_complete_qa"] is True
+assert x["seen_cases"] == 4 and x["seen_lifecycles"] == 4
+assert all(c["phase_evidence"] == "EOS_NULL_FREE_RECORDED"
+           for c in x["cases"].values())
+assert x["decoder_root_cause_proven"] is False
+R301GOOD
+echo 'R301_SOURCE_BACKED_CLEAN_TIMELINE_PASS'
+rc=0
+python3 -B "$analyzer" "$work/sigterm.out" --strict > "$work/r301-sigterm.json" || rc=$?
+[ "$rc" -eq 2 ]
+python3 -B - "$work/r301-sigterm.json" <<'R301BAD'
+import json, sys
+x=json.load(open(sys.argv[1], encoding="utf-8"))
+assert x["r301_complete_qa"] is False
+assert x["seen_lifecycles"] == 4
+assert all(c["phase_evidence"] == "EOS_NO_NULL_MARKER"
+           for c in x["cases"].values())
+assert all(c["exit"] == 143 for c in x["cases"].values())
+assert x["decoder_root_cause_proven"] is False
+R301BAD
+echo 'R301_SOURCE_BACKED_SIGTERM_TIMELINE_REJECTED_PASS'
+rc=0
+python3 -B "$analyzer" "$work/usr1-synthetic-138.out" --strict > "$work/r301-usr1.json" || rc=$?
+[ "$rc" -eq 2 ]
+python3 -B - "$work/r301-usr1.json" <<'R301USR'
+import json,sys
+x=json.load(open(sys.argv[1], encoding="utf-8"))
+assert x["r301_complete_qa"] is False
+assert all(c["exit"] == 138 for c in x["cases"].values())
+assert all(c["configured_signal"] == "USR1" for c in x["cases"].values())
+R301USR
+echo 'R301_SOURCE_BACKED_USR1_NOT_CLEAN_PASS'
 echo 'RESULT=R298_OFFLINE_R282_STRICT_LIFECYCLE_QA_PASS; REAL_LG_NOT_TESTED'
