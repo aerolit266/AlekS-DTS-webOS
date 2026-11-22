@@ -46,7 +46,7 @@ src = pathlib.Path(sys.argv[1]).read_text()
 target, root, mockbin, checksum = sys.argv[2:]
 old_root = "root=/var/lib/webosbrew/aleks-dts-r278"
 old_path = "PATH=/bin:/usr/bin:/sbin:/usr/sbin"
-old_checksum = "7f9ed29c1ea9e6493d1977590a8506e432897f2eabd29ef48a4af6b5"
+old_checksum = "7f9ed29c1ea9e6493d1977590a8506e432897f2eabd29ef2d7fc1ef48a4af6b5"
 for name in (old_root, old_path, old_checksum):
     if src.count(name) != 1:
         raise RuntimeError("Unsupported source layout for mock: " + name)
