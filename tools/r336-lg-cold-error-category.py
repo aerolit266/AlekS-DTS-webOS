@@ -36,7 +36,8 @@ MAX_BYTES=6000000
 def classify(line):
     if b"starfish-media" not in line.lower():
         return None
-    if not (b"user.err" in line.lower() or b" user.error " in line.lower()):
+    if not (b"user.err" in line.lower() or b" user.error " in line.lower()
+            or b" error " in line.lower()):
         return None
     m=STAMP.match(line)
     if not m:
