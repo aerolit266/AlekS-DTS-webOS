@@ -42,8 +42,11 @@ import sys
 from pathlib import Path
 data=(Path('/proc')/sys.argv[1]/'environ').read_bytes().split(b'\x00')
 matches=[s.split(b'=',1)[1].strip() for s in data if s.startswith(b'LD_PRELOAD=')]
-assert len(matches)==1 and matches[0]==b'libsystrim.so.3'
-print('R331_ORIGINAL_PRELOAD_IDENTICAL=YES')
+assert len(matches)==1
+value=matches[0]
+assert value and len(value)<200 and b' ' not in value and b'"' not in value
+assert Path(value.decode('ascii')).name=='libsystrim.so.3'
+print('R331_ORIGINAL_PRELOAD_LIBRARY_PRESERVED=YES')
 PY
 }
 preflight() {
@@ -72,11 +75,23 @@ stage() {
   verify_sha "$EXPECTED_HOOK" "$HOOK"
   cp "$0" "$ROOT/controller.sh"
   chmod 0700 "$ROOT/controller.sh"
-  cat >"$ROOT/observer.env" <<'ENV'
-LD_PRELOAD="libsystrim.so.3 /run/aleks-r331/libaleksr331hook.so"
-ALEKS_R331_ENABLE=YES
-ENV
-  chmod 0600 "$ROOT/observer.env"
+  # Capture the exact existing systemd preload value (not only basename).
+  # Reject unexpected paths, extra libraries or shell/metacharacters.
+  pid=$(systemctl show umediaserver.service -p MainPID --value)
+  python3 - "$pid" "$ROOT/observer.env" <<'PY'
+from pathlib import Path
+import sys,re,os
+items=(Path('/proc')/sys.argv[1]/'environ').read_bytes().split(b'\x00')
+matches=[v.split(b'=',1)[1].decode('ascii') for v in items if v.startswith(b'LD_PRELOAD=')]
+assert len(matches)==1
+preload=matches[0].strip()
+assert re.fullmatch(r'[A-Za-z0-9_./+\-]{1,199}',preload)
+assert Path(preload).name=='libsystrim.so.3'
+data='LD_PRELOAD="'+preload+' /run/aleks-r331/libaleksr331hook.so"\nALEKS_R331_ENABLE=YES\n'
+with open(sys.argv[2],'x',encoding='ascii') as out:out.write(data)
+os.chmod(sys.argv[2],0o600)
+print('R331_EXISTING_PRELOAD_EXACT_VALUE_PRESERVED=YES')
+PY
   echo R331_STAGED_CONFIG_IN_TMPFS=YES
   echo RESULT=R331_RUNTIME_STAGE_PASS
 }
