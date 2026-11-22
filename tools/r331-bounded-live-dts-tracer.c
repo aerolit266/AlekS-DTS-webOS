@@ -272,6 +272,8 @@ static gpointer exporter(gpointer item) {
   guint tick=0;
   for(tick=0;tick<=180;tick+=2) {
     g_usleep(2000000);
+    if(g_get_monotonic_time()-s->start_us>=R331_WINDOW_US)
+      g_atomic_int_set(&s->enabled,0);
     export_snapshot(s,tick+2);
     if(!g_atomic_int_get(&s->enabled)) break;
   }
