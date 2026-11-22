@@ -2,6 +2,7 @@
  * AlekS DTS R330 — isolated same-process audio priming differential.
  * Sequence: DTS stereo cold -> AC3 5.1 -> DTS stereo warm ->
  *           DTS 5.1 cold -> AC3 5.1 -> DTS 5.1 warm.
+ * AC3 uses software avdec_ac3 to avoid the known LG OMX decoder teardown hang.
  *
  * The process creates and destroys its OWN pipelines ending in fakesink.
  * No hooks into another process; no user movie; no audio files, no PCM
@@ -149,12 +150,17 @@ static gboolean name_ok(const gchar *path, const char *basename) {
 
 static gboolean run_phase(const Phase *phase, Stats *s) {
   /* No runtime callbacks modify other processes, sound or state. */
+  /* LG's OMX AC3 hardware decoder is known to hang on isolated teardown.
+     Use the explicitly tested software avdec_ac3 only as a controlled
+     priming comparison. Do not claim it models native Lampa AC3 handoff. */
+  const char *decoder_route = phase->is_dts ?
+    "decodebin name=decoder" : "ac3parse ! avdec_ac3 name=decoder";
   gchar *pipeline_str = g_strdup_printf(
     "filesrc location=\"%s\" ! matroskademux name=dm "
-    "dm.audio_0 ! queue ! decodebin name=decoder ! "
+    "dm.audio_0 ! queue ! %s ! "
     "audioconvert ! audio/x-raw,format=S16LE,channels=%u,rate=48000 ! "
     "identity name=metric ! fakesink sync=false",
-    phase->path, phase->channels);
+    phase->path, decoder_route, phase->channels);
   GError *error = NULL;
   GstElement *pipeline = gst_parse_launch(pipeline_str, &error);
   g_free(pipeline_str);
