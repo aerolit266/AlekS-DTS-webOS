@@ -63,7 +63,18 @@ compare() {
       }
       next
     }
-    $1~/^(ALSA_PCM6|ALSA_HW_FRAMES_2S|ALSA_APPL_FRAMES_2S|R130_INITIAL_EVENT_LIMIT|R130_NO_INPUT_CAPS|R130_UNRECOGNIZED_CAPS|GST_NOT_NEGOTIATED|NATIVE_AUDIO_SINK_ERROR_HINT|DCADEC_ERROR_HINT|NATIVE_LOG_COUNTS)$/ {
+    # R308 places both ALSA pointers on ONE line separated by spaces.
+    # Split each key=value token, never treat the rest of the line as a pointer.
+    $1=="ALSA_HW_FRAMES_2S" || $1=="ALSA_APPL_FRAMES_2S" {
+      count=split($0,words,/ +/)
+      for(j=1;j<=count;j++) {
+        pieces=split(words[j],pair,/=/)
+        if(pieces==2 && pair[1]~/^(ALSA_HW_FRAMES_2S|ALSA_APPL_FRAMES_2S)$/ &&
+           pair[2]~/^[0-9]+$/) value[side,pair[1]]=pair[2]
+      }
+      next
+    }
+    $1~/^(ALSA_PCM6|R130_INITIAL_EVENT_LIMIT|R130_NO_INPUT_CAPS|R130_UNRECOGNIZED_CAPS|GST_NOT_NEGOTIATED|NATIVE_AUDIO_SINK_ERROR_HINT|DCADEC_ERROR_HINT|NATIVE_LOG_COUNTS)$/ {
       value[side,$1]=$2;next
     }
     END {
