@@ -29,11 +29,19 @@ compare() {
       n++; keys[n]="QUERY_OUTPUT"
     }
     $0=="R310_PAIR_DIVIDER" {side=2;query="";next}
-    $1=="STAGE" {tag[side]=$2;next}
+    $1=="STAGE" {
+      split($0,fields,/ +/)
+      split(fields[1],pair,"=")
+      tag[side]=pair[2]
+      next
+    }
     $1=="STARFISH" {
-      for(i=1;i<=NF;i++)if($i~/^DTS_WRAPPER_HOLDERS=/) {
-        split($i,x,"=");value[side,"DTS_WRAPPER_HOLDERS"]=x[2]
+      nwords=split($0,fields,/ +/)
+      for(i=1;i<=nwords;i++)if(fields[i]~/^DTS_WRAPPER_HOLDERS=/) {
+        split(fields[i],pair,"=")
+        value[side,"DTS_WRAPPER_HOLDERS"]=pair[2]
       }
+      next
     }
     $1=="QUERY" {query=$2;next}
     $1=="QUERY_STATUS" && (query=="CODEC" || query=="OUTPUT") {
