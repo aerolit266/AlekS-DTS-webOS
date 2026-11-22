@@ -132,7 +132,8 @@ def compare(before, after, heard_before, heard_after):
 def selftest():
     # R294 actual idle field layout (sanitized; from witnessed TV output).
     idle = extract("""=== R294 ===
-STARFISH_PROCESSES=1 DTS_PLUGIN_HOLDERS=0
+STARFISH_PROCESSES=1
+DTS_PLUGIN_HOLDERS=0
 PULSE_INPUT_COUNT=0
 ALSA_PCM6=closed
 QUERY=CODEC
