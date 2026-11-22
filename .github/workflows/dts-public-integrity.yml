@@ -120,7 +120,7 @@ jobs:
           assert base.replace("R337","R338").replace("r337","r338")==obs
           assert 'ALEKS_R338_ENABLE' in obs
           assert '"/run/aleks-r338/metrics"' in obs
-          assert '"r338-%ld.json"' in obs
+          assert '/r338-%ld.json"' in obs
           assert 'ALEKS_R338_ISOLATED_QA' in obs
           assert 'ALEKS_R338_ENABLE=YES' in control
           assert 'ROOT=/run/aleks-r338' in control
