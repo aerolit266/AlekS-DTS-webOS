@@ -22,13 +22,24 @@ query() {
     printf 'QUERY_STATUS=UNAVAILABLE exit=%s\n' "$code"
     return
   fi
+  # According to LS2, returnValue=false is an API failure, NOT a
+  # successful status query. Treat missing success as unknown as well.
+  if printf '%s\n' "$reply" | grep -Eq '"returnValue"[[:space:]]*:[[:space:]]*false'; then
+    echo 'QUERY_STATUS=API_RETURN_FALSE'
+    printf '%s\n' "$reply" | grep -Eo '"errorCode"[[:space:]]*:[[:space:]]*-?[0-9]{1,5}' | head -n 1 || :
+    return
+  fi
+  if ! printf '%s\n' "$reply" | grep -Eq '"returnValue"[[:space:]]*:[[:space:]]*true'; then
+    echo 'QUERY_STATUS=NO_SUCCESS_MARKER'
+    return
+  fi
   # Count only, not print the raw arrays or any connection/session IDs.
   count=$(printf '%s\n' "$reply" | grep -oE '"(source|streamType|audioType)"[[:space:]]*:' | wc -l)
   printf 'MATCHING_AUDIO_FIELDS=%s\n' "$count"
   printf '%s\n' "$reply" |
     grep -Eo '"(returnValue|subscribed|codec|source|sourcePort|sink|streamType|audioType|muted|muteStatus|activeStatus|policyStatus|outputMode|inputVolume|errorCode)"[[:space:]]*:[[:space:]]*("[A-Za-z0-9_.-]{1,35}"|-?[0-9]{1,5}|true|false)' |
     head -n 32 || :
-  printf 'QUERY_STATUS=RESPONDED; VALUES_NOT_LINKED_TO_ARRAY_OBJECTS\n'
+  printf 'QUERY_STATUS=RESPONDED_RETURN_TRUE; VALUES_NOT_LINKED_TO_ARRAY_OBJECTS\n'
 }
 # Both methods documented on webOS OSE; LG consumer firmware may differ.
 # No subscription, connection setup or playback requested.
