@@ -132,8 +132,16 @@ def dts_raw(encoded_mka, frame_bytes, expected_raw):
 
 
 def main():
-    if len(sys.argv) != 1:
+    global TV_STAGE, EXPECTED_PLUGIN
+    if len(sys.argv) == 2 and sys.argv[1] == "timesegment":
+        TV_STAGE = Path("/tmp/aleks-r325-timesegment-20261122")
+        EXPECTED_PLUGIN = "e90242c3559e7d5586f8d64995a2b81dd0299cd67c38fb46f09af1caae5e8863"
+        candidate = "TIMESEGMENT_ONLY"
+    elif len(sys.argv) == 1:
+        candidate = "R312_ORIGINAL"
+    else:
         raise ValueError("UNEXPECTED_ARGUMENTS")
+    print("R325_CANDIDATE=" + candidate)
     if platform.machine() != "aarch64":
         raise ValueError("NOT_KITCHEN_LG_ARCH")
     plugin = TV_STAGE / "libgstaleksdtsr188framer.so"
