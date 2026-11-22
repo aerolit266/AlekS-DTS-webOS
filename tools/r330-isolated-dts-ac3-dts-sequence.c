@@ -12,6 +12,7 @@
  *              /tmp/aleks-r330-XXX/surround.mka
  * SPDX-License-Identifier: MIT
  */
+#define _POSIX_C_SOURCE 200809L
 #include <gst/gst.h>
 #include <math.h>
 #include <stdint.h>
