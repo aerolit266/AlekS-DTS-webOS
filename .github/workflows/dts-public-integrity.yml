@@ -42,4 +42,9 @@ jobs:
           sh -n tools/run-r329-isolated-pad-probe-lab.sh
           sh -n tools/build-r329-armel-pad-probe-lab.sh
           python3 -c "import ast,pathlib; ast.parse(pathlib.Path('tools/r329-stage-public-fixtures.py').read_text())"
+      - name: Validate R330 isolated DTS AC3 sequence scripts and source pin
+        run: |
+          sh -n tools/run-r330-isolated-dts-ac3-sequence.sh
+          echo 'd47b34303c1adbd91f8c1b5212a46c9b4975138b8195116eb142fe117fe4aeb9  tools/r330-isolated-dts-ac3-dts-sequence.c' | sha256sum -c -
+
 
