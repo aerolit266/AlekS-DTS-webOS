@@ -88,6 +88,37 @@ int main(int argc, char **argv) {
                pass ? "PASS" : "FAIL");
         success &= pass;
     }
+    /* Validate the proposed caller contract on the *entire* fixture:
+     * one persistent libdcadec context, one complete DTS Core frame per
+     * parse/filter, chronological order, no PCM recording. */
+    struct dcadec_context *sequential = dcadec_context_create(0);
+    if (!sequential) return 2;
+    uint32_t packet_words[(DTS_FRAME_BYTES + 16) / sizeof(uint32_t)];
+    uint8_t *packet = (uint8_t *)packet_words;
+    int total_samples = 0, decoded = 0;
+    for (size_t pos = 0; pos < count; pos += DTS_FRAME_BYTES) {
+        memcpy(packet, encoded + pos, DTS_FRAME_BYTES);
+        memset(packet + DTS_FRAME_BYTES, 0, 16);
+        int parsed = dcadec_context_parse(sequential, packet, DTS_FRAME_BYTES);
+        if (parsed < 0) break;
+        int **pcm = NULL;
+        int samples = 0, channels = 0, rate = 0, bits = 0, profile = 0;
+        if (dcadec_context_filter(sequential, &pcm, &samples,
+                                  &channels, &rate, &bits, &profile) < 0 ||
+            !pcm || samples != 512 || channels != 3 || rate != 48000) break;
+        total_samples += samples;
+        decoded++;
+    }
+    dcadec_context_destroy(sequential);
+    int complete_pass = decoded == EXPECTED_FRAMES &&
+                        total_samples == EXPECTED_FRAMES * 512;
+    printf("R324_SEQUENTIAL_DECODED_FRAMES=%d_OF_%d\n",
+           decoded, EXPECTED_FRAMES);
+    printf("R324_SEQUENTIAL_PCM_SAMPLES_PER_CHANNEL=%d\n", total_samples);
+    printf("R324_SEQUENTIAL_ONE_FRAME_PER_CALL=%s\n",
+           complete_pass ? "PASS" : "FAIL");
+    success &= complete_pass;
+
     struct result broken = decode(encoded, count, 1024, 1);
     int reject_ok = !broken.parse_ok && !broken.pcm_ok;
     printf("R324_CORRUPT_FIRST_FRAME_REJECT=%s\n", reject_ok ? "PASS" : "FAIL");
