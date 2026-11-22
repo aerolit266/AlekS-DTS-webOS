@@ -207,3 +207,6 @@ Do not disable ABI/GStreamer checks when an installation refuses. [Open a compat
 
 
 © 2026 AlekS / GameFree24 (@aerolit266). [Documentation terms](LICENSE.md).
+
+
+**R311/R312 (2026-11-22, isolated VPS):** the original bounded R188 framer with a restricted genuine DTS Core BE16 header probe recovered **byte-exact reference PCM** from the original R278 stereo and 5.1 fixtures at 1/11/97/4096-byte raw input blocks (8/8). R312 separately repairs experimental R188's reproducible GStreamer `segment before caps` sticky-event ordering (CAPS → SEGMENT → first frame); zero ordering warnings, 3/3 bad DTS cases rejected, 8/8 GstPad event and 8/8 ASan/UBSan event PASS. [Reproducible R312 QA](tools/run-r312-real-dts-ordered-events.sh), [report](docs/R311_R312_REAL_DTS_FIRST_FRAME_QA.md). **NOT installed on kitchen LG R278; its first-start silent playback cause remains unverified.**
