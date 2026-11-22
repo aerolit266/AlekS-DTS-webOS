@@ -93,6 +93,17 @@ def levels(label, cmd, channels, env, need_framer):
     print("R325_" + label + "_R278_DECODER_USED=" + str(native).lower())
     print("R325_" + label + "_FRAMER_USED=" + str(framer).lower())
     print("R325_" + label + "_WARNING_COUNT=" + str(len(tags)))
+    print("R325_" + label + "_WARNING_TAGS=" + (",".join(tags) or "NONE"))
+    if status:
+        # This child uses ONLY the pinned public R278 fixtures. Print short,
+        # path-redacted diagnostic lines; never dump arbitrary process logs.
+        for line in log.splitlines():
+            if any(word in line for word in ("ERROR:", "WARNING:", "CRITICAL:", "Error from", "error: from")):
+                safe = line.replace(str(ROOT), "[R278]").replace(str(TV_STAGE), "[R325]")
+                print("R325_" + label + "_FAIL_HINT=" + safe[:220])
+                if "from element" in line:
+                    continue
+                break
     if status or not windows or active != len(windows) or tags or not native:
         raise ValueError("DECODE_OR_EVENT_CHECK_FAILED_" + label)
     if need_framer and not framer:
