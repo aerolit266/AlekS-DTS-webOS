@@ -84,8 +84,7 @@ R300_TIMEOUT_SIGNAL=USR1 PATH="$work/mockbin:$PATH" sh "$work/r282-isolated.sh" 
 [ "$rc" -ne 0 ]
 [ "$(grep -c 'WRAPPER_REQUESTED_USR1_NOT_TERM' "$work/usr1-natural-term.out")" -eq 4 ]
 [ "$(grep -c '^LIFECYCLE=.*timeout_signal=USR1' "$work/usr1-natural-term.out")" -eq 4 ]
-grep -q '^TIMEOUT_QA_SIGNAL=USR1 BUDGET_SECONDS=12 DISTINCT_SIGNAL_MODE=yes
- "$work/usr1-natural-term.out"
+grep -Fq 'TIMEOUT_QA_SIGNAL=USR1 BUDGET_SECONDS=12 DISTINCT_SIGNAL_MODE=yes' "$work/usr1-natural-term.out"
 echo 'R300_USR1_OPTIN_NATURAL_SIGTERM_143_DISTINGUISHED_PASS'
 rm -f "$work/simulate-sigterm"
 R300_TIMEOUT_SIGNAL=USR1 PATH="$work/mockbin:$PATH" sh "$work/r282-isolated.sh" > "$work/usr1-clean.out"
