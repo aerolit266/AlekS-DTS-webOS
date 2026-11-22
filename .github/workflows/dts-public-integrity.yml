@@ -48,3 +48,23 @@ jobs:
           echo 'd47b34303c1adbd91f8c1b5212a46c9b4975138b8195116eb142fe117fe4aeb9  tools/r330-isolated-dts-ac3-dts-sequence.c' | sha256sum -c -
 
 
+      - name: Validate R333/R334 read-only diagnostics and DTS codec taxonomy
+        run: |
+          python3 tools/r334-live-lg-codec-event-snapshot.py selftest
+          python3 - <<'PY'
+          import ast, pathlib, importlib.util
+          files = [
+              "tools/r333-readonly-lg-audio-route.py",
+              "tools/r333-native-lg-audio-logs-readonly.py",
+          ]
+          for path in files:
+              ast.parse(pathlib.Path(path).read_text())
+          spec = importlib.util.spec_from_file_location("r333_native", files[1])
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          assert not module.PATTERNS["DTS_CODEC"].search(b"buffer pts 0:08:15 dts 0:08:15")
+          assert not module.PATTERNS["DTS_CODEC"].search(b"dts-seamless=0")
+          assert module.PATTERNS["DTS_CODEC"].search(b"audio/x-dts")
+          assert module.PATTERNS["AC3"].search(b"GstOMXAc3DecBin")
+          print("RESULT=R333_R334_CODEC_TAXONOMY_CI_PASS")
+          PY
