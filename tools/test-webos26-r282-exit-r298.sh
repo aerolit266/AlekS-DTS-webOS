@@ -77,4 +77,23 @@ grep -q '^RESULT=R282_ISOLATED_DECODEBIN3_AND_PCM_PROBE_INCOMPLETE;' "$work/sigt
 [ "$(grep -c '^LIFECYCLE=.*pipeline_free_seen=no' "$work/sigterm.out")" -eq 4 ]
 [ "$(grep -c '^LIFECYCLE=.*deadline_compatible=no' "$work/sigterm.out")" -eq 4 ]
 echo 'R298_R282_EOS_EXIT143_REJECTED_PASS'
+# R300: USR1 mode is opt-in only; a child exiting 143 is distinct from
+# a wrapper which was configured to send SIGUSR1 on expiration.
+rc=0
+R300_TIMEOUT_SIGNAL=USR1 PATH="$work/mockbin:$PATH" sh "$work/r282-isolated.sh" > "$work/usr1-natural-term.out" || rc=$?
+[ "$rc" -ne 0 ]
+[ "$(grep -c 'WRAPPER_REQUESTED_USR1_NOT_TERM' "$work/usr1-natural-term.out")" -eq 4 ]
+[ "$(grep -c '^LIFECYCLE=.*timeout_signal=USR1' "$work/usr1-natural-term.out")" -eq 4 ]
+grep -q '^TIMEOUT_QA_SIGNAL=USR1 BUDGET_SECONDS=12 DISTINCT_SIGNAL_MODE=yes
+ "$work/usr1-natural-term.out"
+echo 'R300_USR1_OPTIN_NATURAL_SIGTERM_143_DISTINGUISHED_PASS'
+rm -f "$work/simulate-sigterm"
+R300_TIMEOUT_SIGNAL=USR1 PATH="$work/mockbin:$PATH" sh "$work/r282-isolated.sh" > "$work/usr1-clean.out"
+[ "$(grep -c 'CLEAN_EXIT_AND_DECODE_PASS' "$work/usr1-clean.out")" -eq 4 ]
+echo 'R300_USR1_OPTIN_CLEAN_EXIT0_PASS'
+rc=0
+R300_TIMEOUT_SIGNAL=INVALID PATH="$work/mockbin:$PATH" sh "$work/r282-isolated.sh" > "$work/invalid.out" 2>&1 || rc=$?
+[ "$rc" -eq 2 ]
+grep -q 'BLOCKED: unsupported R300_TIMEOUT_SIGNAL=INVALID' "$work/invalid.out"
+echo 'R300_INVALID_SIGNAL_BLOCKED_PASS'
 echo 'RESULT=R298_OFFLINE_R282_STRICT_LIFECYCLE_QA_PASS; REAL_LG_NOT_TESTED'
