@@ -431,7 +431,7 @@ static void save_snapshot(unsigned elapsed) {
     "\"format_f32_buffers\":%llu,\"bad_maps\":%llu,"
     "\"ignored_pcm\":%llu,\"clipped\":%llu,"
     "\"raw_pcm_exported\":false,\"audio_files_created\":0,"
-    "\"pipeline_mutated\":false,\"external_process_attached\":false,"
+    "\"pipeline_mutated\":false,\"external_process_attached\":false,",
     elapsed,(unsigned long long)stats.input_buffers,
     (unsigned long long)stats.be16_sync,
     (unsigned long long)stats.missing_pts,
