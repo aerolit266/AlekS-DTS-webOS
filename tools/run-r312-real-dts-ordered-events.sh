@@ -1,6 +1,7 @@
 #!/bin/sh
-# R312: reproducible DTS Core framing + correct CAPS-before-SEGMENT regression using the original
-# 2026 R188 C99 + Gst plugin, a newly REAL but restricted R311 header probe,
+# R312: reproducible DTS Core framing + correct CAPS-before-SEGMENT regression using the UNMODIFIED
+# R188 C99 assembler, a DERIVED R312 GStreamer wrapper, and a restricted
+# real-header R311 probe,
 # and the exact public R278 release DTS stereo and 5.1 fixtures.
 # No LG, no services, no apt install, no audio device, no original R122.
 set -eu
@@ -11,7 +12,7 @@ for tool in curl sha256sum gcc dpkg-deb gst-inspect-1.0 gst-launch-1.0 ffmpeg py
         echo "R312_BLOCKED_MISSING=$tool";exit 2;
     }
 done
-d=$(mktemp -d /tmp/aleks-r311-real-dts.XXXXXX)
+d=$(mktemp -d /tmp/aleks-r312-real-dts.XXXXXX)
 trap 'rm -rf "$d"' EXIT HUP INT TERM
 mkdir -p "$d/sdk" "$d/plugins"
 root=https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS
@@ -72,7 +73,7 @@ gcc -std=c11 -O2 -fPIC -shared -Wall -Wextra -Werror \
 export GST_PLUGIN_PATH="$d/plugins" GST_REGISTRY="$d/registry.bin" GST_REGISTRY_FORK=no
 gst-inspect-1.0 aleksdtsr188framer >"$d/inspect.log" 2>&1
 grep -q 'Rank                     none (0)' "$d/inspect.log"
-echo R312_UNMODIFIED_R188_PLUGIN_COMPILE_AND_REGISTER_PASS
+echo R312_DERIVED_R188_PLUGIN_COMPILE_AND_REGISTER_PASS
 for track in dts-stereo dts-51;do
  if [ "$track" = dts-stereo ];then channels=2;else channels=6;fi
  ffmpeg -hide_banner -loglevel error -nostdin \
