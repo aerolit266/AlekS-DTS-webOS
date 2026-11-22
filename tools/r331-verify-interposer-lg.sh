@@ -9,7 +9,7 @@ export LC_ALL
 lab=/tmp/aleks-r331-interposer-qa-20261122
 fixtures=/tmp/aleks-r331-interposer-fixtures-20261122
 original=/var/lib/webosbrew/aleks-dts-r278
-sha=e198c399e303d019349c4e10c0e8adc251d69c36b531c658473632cca4a27edc
+sha=deb1adb853e4d7546ce0fc7a8b446a849b7b3a47fbcdb5dcf870b16ce1cd8057
 test "$(id -u)" -eq 0
 test -d "$lab" && test ! -L "$lab"
 test "$(stat -c %a "$lab")" = 700
