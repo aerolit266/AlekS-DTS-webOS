@@ -49,7 +49,7 @@ static GstPadProbeReturn inspect_encoded(GstPad *pad, GstPadProbeInfo *info,
             case GST_EVENT_CAPS: {
                 s->caps_events++;
                 if (!s->seen_stream) s->order_violations++;
-                const GstCaps *caps = NULL;
+                GstCaps *caps = NULL;
                 gst_event_parse_caps(e, &caps);
                 if (caps && gst_caps_get_size(caps) > 0) {
                     const GstStructure *st = gst_caps_get_structure(caps, 0);
@@ -108,11 +108,12 @@ static GstPadProbeReturn inspect_encoded(GstPad *pad, GstPadProbeInfo *info,
 
 static GstPadProbeReturn inspect_pcm(GstPad *pad, GstPadProbeInfo *info,
                                      gpointer ctx) {
+    (void)pad;
     R329Stats *s = (R329Stats *)ctx;
     if (GST_PAD_PROBE_INFO_TYPE(info) & GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM) {
         GstEvent *e = GST_PAD_PROBE_INFO_EVENT(info);
         if (GST_EVENT_TYPE(e) == GST_EVENT_CAPS) {
-            const GstCaps *caps = NULL;
+            GstCaps *caps = NULL;
             gst_event_parse_caps(e, &caps);
             if (caps && gst_caps_get_size(caps) > 0) {
                 const GstStructure *st = gst_caps_get_structure(caps, 0);
