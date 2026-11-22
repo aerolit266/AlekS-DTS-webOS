@@ -24,7 +24,7 @@ ROTATIONS = ("legacy-log", "legacy-log.0.gz", "legacy-log.1.gz",
 ISO = re.compile(rb"^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.\d+)?Z")
 PORT = re.compile(rb"(?:audio-port|dec_port)[ =:]+(?:\(int\))?(\d{1,2})", re.I)
 SECONDS = 8 * 60
-MAX_BYTES_PER_FILE = 2600000
+MAX_BYTES_PER_FILE = 5000000
 MAX_EVENT_OUTPUT = 45
 
 
@@ -36,7 +36,7 @@ def labels(line: bytes) -> tuple:
     if b"resource-info" in low and (b"gst_rtk_codec_bin_set_property" in low
                                    or b"gstomxaudiodec" in low):
         ans.append("DECODER_RESOURCE_BIND")
-    if b"omxac3decbin" in low and (b" init " in low or b"gst_rtk_codec_bin_init" in low):
+    if b"omxac3decbin" in low and (b" init " in low or low.endswith(b" init") or b"gst_rtk_codec_bin_init" in low):
         ans.append("HW_AC3_BIN_INIT")
     if b"success to switch decoder" in low:
         ans.append("DECODER_SWITCH_SUCCESS")
