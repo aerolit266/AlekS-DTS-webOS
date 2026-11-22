@@ -130,6 +130,18 @@ def gst_decode(root, name, source, channels, blocksize, variant, repeat=0):
     return pcm_stats(filename, channels)
 
 
+def gst_avdec_packetized(root, name, source, channels):
+    filename = root / (name + "-gstreamer-avdec.raw")
+    args = ["gst-launch-1.0", "-q", "filesrc",
+            f"location={source}", "blocksize=11", "!",
+            "matroskademux", "!", "avdec_dca", "!",
+            "audioconvert", "!",
+            f"audio/x-raw,format=S16LE,channels={channels},rate={SAMPLE_RATE}",
+            "!", "filesink", f"location={filename}"]
+    run(args, timeout=30)
+    return pcm_stats(filename, channels)
+
+
 def compare_one(name, channels, root):
     dts, mka, packets, ff = make_stream(root, name, channels)
     raw, packetized = {}, {}
@@ -157,6 +169,18 @@ def compare_one(name, channels, root):
         }
     if raw[4096]["sha256"] != expected["sha256"]:
         raise ValueError(f"{name}_BASELINE_RAW4096_NOT_ALIGNED_WITH_PACKETIZED")
+    for block in (11, 97):
+        again = gst_decode(root, name, dts, channels, block, "raw", repeat=1)
+        raw_differences[str(block)]["second_run_frames"] = again["frames"]
+        raw_differences[str(block)]["repeat_pcm_sha_same"] = (
+            again["sha256"] == raw[block]["sha256"])
+    avdec = gst_avdec_packetized(root, name, mka, channels)
+    if avdec["frames"] != expected["frames"]:
+        raise ValueError(f"{name}_INDEPENDENT_GSTREAMER_AVDEC_FRAME_COUNT_MISMATCH")
+    if any(x["peak_s16"] < 100 or x["first_above_128_frame"] is None
+           for x in avdec["channels"]):
+        raise ValueError(f"{name}_AVDEC_NO_SIGNAL")
+
     # Verify comparable per-channel signal without assuming exact PCM
     # identity across FFmpeg and libdca/GStreamer.
     for ch in range(channels):
@@ -181,6 +205,8 @@ def compare_one(name, channels, root):
         "packetized_sha256": expected["sha256"],
         "packetized_all_3_blocks_identical": True,
         "repeat_first_start_11_block_identical": True,
+        "gstreamer_avdec_dca_packetized_frames": avdec["frames"],
+        "gstreamer_avdec_dca_sha256": avdec["sha256"],
         "raw_bytestream": raw_differences,
         "packetized_signal": expected["channels"],
         "ffmpeg_signal": ff["channels"],
@@ -196,6 +222,10 @@ def main():
         result = {
             "schema": "aleks.dts.r306.raw-vs-packetized.v1",
             "environment": "isolated host, no audio output devices",
+            "runtime": {
+                "ffmpeg": run(["ffmpeg", "-version"]).splitlines()[0],
+                "gstreamer": run(["gst-launch-1.0", "--version"]).splitlines()[0],
+            },
             "streams": {
                 "stereo": compare_one("stereo", 2, root),
                 "surround": compare_one("surround", 6, root),
