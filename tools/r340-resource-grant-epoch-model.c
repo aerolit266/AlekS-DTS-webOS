@@ -26,7 +26,8 @@
 typedef enum {
     R340_LOAD, R340_UNLOAD, R340_STREAM_START, R340_DTS_CAPS,
     R340_AC3_CAPS, R340_GRANT, R340_RELEASE, R340_CHILD_NEW,
-    R340_CHILD_GONE, R340_FLUSH_START, R340_FLUSH_STOP
+    R340_CHILD_GONE, R340_FLUSH_START, R340_FLUSH_STOP,
+    R340_SOFTWARE_CHILD_NEW, R340_POLICY_SUSPEND, R340_POLICY_RESUME
 } R340_Event;
 
 typedef enum {
@@ -46,7 +47,7 @@ typedef struct {
     uint32_t delivered_gen, delivered_version;
     uint32_t pending_gen, pending_version;
     uint32_t deliveries, accepted, rejected, stale_acks, replayed;
-    bool loaded, child, grant, flushing, pending;
+    bool loaded, child, child_hw, grant, flushing, pending;
     int port, codec;
 } R340_State;
 
@@ -74,7 +75,7 @@ static bool delivered(const R340_State *s) {
 
 static R340_Decision maybe_issue(R340_State *s, bool from_grant) {
     R340_Decision d = none();
-    if (!s->loaded || !s->child || !s->grant || s->flushing ||
+    if (!s->loaded || !s->child || !s->child_hw || !s->grant || s->flushing ||
         s->pending || delivered(s))
         return d;
     s->pending = true;
@@ -131,6 +132,7 @@ static R340_Decision apply(R340_State *s, R340_Event event, int port) {
             break;
         case R340_CHILD_GONE:
             s->child = false;
+            s->child_hw = false;
             s->pending = false;
             s->pending_gen = 0;
             s->pending_version = 0;
@@ -143,8 +145,31 @@ static R340_Decision apply(R340_State *s, R340_Event event, int port) {
                 return result;
             }
             s->child = true;
+            s->child_hw = true;
             s->generation = advance(s->generation);
             return maybe_issue(s, false);
+        case R340_SOFTWARE_CHILD_NEW:
+            /* DTS software decoder does NOT consume hardware grant. */
+            if (s->child) return result;
+            s->child = true;
+            s->child_hw = false;
+            s->generation = advance(s->generation);
+            return result;
+        case R340_POLICY_SUSPEND:
+            /* A suspended pipeline loses permission to reuse the old grant. */
+            s->grant = false;
+            s->port = -1;
+            s->child = false;
+            s->child_hw = false;
+            s->flushing = true;
+            s->pending = false;
+            s->delivered_gen = 0;
+            s->delivered_version = 0;
+            return result;
+        case R340_POLICY_RESUME:
+            s->flushing = false;
+            /* Never synthesize grant after resume; await actual uMS event. */
+            return result;
         case R340_FLUSH_START:
             s->flushing = true;
             /* Pending delivery is invalid after a flush; still keep grant. */
@@ -161,7 +186,7 @@ static R340_Decision apply(R340_State *s, R340_Event event, int port) {
 
 static bool acknowledge(R340_State *s, R340_Decision d, bool accepted) {
     if (d.action == R340_NONE || !s->loaded || !s->child ||
-        !s->grant || !s->pending || s->flushing ||
+        !s->grant || !s->pending || !s->child_hw || s->flushing ||
         s->epoch != d.epoch || s->generation != d.generation ||
         s->grant_version != d.grant_version ||
         s->port != d.port || s->pending_gen != d.generation ||
@@ -182,7 +207,8 @@ static bool acknowledge(R340_State *s, R340_Decision d, bool accepted) {
 
 static void invariants(const R340_State *s) {
     assert(s->epoch > 0);
-    assert(!s->pending || (s->loaded && s->child && s->grant));
+    assert(!s->pending || (s->loaded && s->child && s->child_hw && s->grant));
+    assert(!s->child_hw || s->child);
     assert(!s->pending || (s->pending_gen == s->generation &&
                            s->pending_version == s->grant_version));
     assert(!s->grant || (s->loaded && s->port >= 0 && s->port <= 15));
@@ -302,14 +328,35 @@ static void unit(void) {
     assert(!acknowledge(&s, d, true));
     ++pass;
 
+    /* Software DTS path never receives a hardware grant; cache is retained. */
+    apply(&s, R340_UNLOAD, 0);
+    apply(&s, R340_LOAD, 0);
+    assert(apply(&s, R340_SOFTWARE_CHILD_NEW, 0).action == R340_NONE);
+    assert(apply(&s, R340_GRANT, 0).action == R340_NONE);
+    apply(&s, R340_CHILD_GONE, 0);
+    d = apply(&s, R340_CHILD_NEW, 0);
+    assert(d.action == R340_REPLAY_CACHED_GRANT);
+    assert(acknowledge(&s, d, true));
+    ++pass;
+
+    /* Policy suspend revokes resource grant; resume needs a fresh grant. */
+    apply(&s, R340_POLICY_SUSPEND, 0);
+    apply(&s, R340_POLICY_RESUME, 0);
+    assert(apply(&s, R340_CHILD_NEW, 0).action == R340_NONE);
+    assert(!s.grant);
+    d = apply(&s, R340_GRANT, 0);
+    assert(d.action == R340_FORWARD_ORIGINAL_GRANT);
+    assert(acknowledge(&s, d, true));
+    ++pass;
+
     /* No event is emitted before a real load (fail-closed). */
     apply(&s, R340_UNLOAD, 0);
     assert(apply(&s, R340_GRANT, 0).action == R340_NONE);
     assert(apply(&s, R340_CHILD_NEW, 0).action == R340_NONE);
     assert(!s.grant && !s.child);
     ++pass;
-    printf("R340_DETERMINISTIC=%u/13 PASS\n", pass);
-    assert(pass == 13);
+    printf("R340_DETERMINISTIC=%u/15 PASS\n", pass);
+    assert(pass == 15);
 }
 
 /* Fixed-seed fuzz: no external clocks, inputs, heap or I/O. */
@@ -327,13 +374,13 @@ static void fuzz(void) {
         apply(&s, R340_LOAD, 0);
         for (unsigned j = 0; j < 40; ++j) {
             uint32_t q = rnd(&seed);
-            R340_Event event = (R340_Event)(q % 11u);
+            R340_Event event = (R340_Event)(q % 14u);
             int port = (q & 0x100u) ? 0 : ((q & 0x200u) ? 1 : 16);
             R340_Decision d = apply(&s, event, port);
             if (d.action != R340_NONE) {
                 assert(event == R340_GRANT || event == R340_CHILD_NEW ||
                        event == R340_FLUSH_STOP);
-                assert(s.loaded && s.child && s.grant && s.pending);
+                assert(s.loaded && s.child && s.child_hw && s.grant && s.pending);
                 assert(d.port == s.port && d.epoch == s.epoch);
                 ++emissions;
                 if ((rnd(&seed) & 3u) != 0)
@@ -351,6 +398,6 @@ static void fuzz(void) {
 int main(void) {
     unit();
     fuzz();
-    puts("RESULT=R340_PURE_C99_GRANT_REPLAY_MODEL_13_AND_1M_PASS");
+    puts("RESULT=R340_PURE_C99_GRANT_REPLAY_MODEL_15_AND_1M_PASS");
     return 0;
 }
