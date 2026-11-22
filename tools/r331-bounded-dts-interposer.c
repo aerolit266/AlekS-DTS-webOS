@@ -76,6 +76,7 @@ static struct {
 } a;
 static pthread_once_t resolve_once=PTHREAD_ONCE_INIT;
 static pthread_mutex_t mu=PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t io_mu=PTHREAD_MUTEX_INITIALIZER;
 static atomic_int enabled=ATOMIC_VAR_INIT(0);
 static unsigned long started_at=0;
 static int qa_mode=0;
@@ -300,12 +301,17 @@ static void save_snapshot(unsigned elapsed) {
   if(count<=0 || count>=(int)sizeof(json))return;
   char tmp[240];
   snprintf(tmp,sizeof(tmp),"%s.tmp",output_path);
+  pthread_mutex_lock(&io_mu);
   int fd=open(tmp,O_CREAT|O_TRUNC|O_WRONLY|O_CLOEXEC|O_NOFOLLOW,0600);
-  if(fd<0)return;
+  if(fd<0) {
+    pthread_mutex_unlock(&io_mu);
+    return;
+  }
   ssize_t wrote=write(fd,json,count);
   close(fd);
-  if(wrote!=count){unlink(tmp);return;}
-  if(rename(tmp,output_path))unlink(tmp);
+  if(wrote!=count)unlink(tmp);
+  else if(rename(tmp,output_path))unlink(tmp);
+  pthread_mutex_unlock(&io_mu);
 }
 static void *writer_thread(void *unused) {
   (void)unused;
