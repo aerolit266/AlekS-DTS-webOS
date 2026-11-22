@@ -21,14 +21,16 @@ FILES = ("bootd.log", "initctl.log", "dbg-log", "legacy-log",
 MAX_UNCOMPRESSED_PER_FILE = 5_000_000
 MAX_LINES = 250000
 PATTERNS = {
-    "DTS": re.compile(rb"\bdts\b|audio/x-dts|a_dts", re.I),
+    "DTS_CODEC": re.compile(rb"audio/x-dts|\bA_DTS\b|\baleksdts\w*|\bdtsdec\b|(?:codec|audio-format)[=: ]{1,16}dts(?:-hd)?\b", re.I),
+    "DTS_SEAMLESS_FLAG": re.compile(rb"\bdts-seamless\b", re.I),
     "AC3": re.compile(rb"\bac-?3\b|eac3|dolby", re.I),
     "DECODER": re.compile(rb"decproxy|(?:audio|gst).*decod|\badec\b|fakeadec", re.I),
     "RESOURCE": re.compile(rb"acquired.?resource|resource.?acquir|grant|allocat|release.?resource", re.I),
     "AUDIO_ROUTE": re.compile(rb"audiooutputd|audio.?sink|audio.?route|sound.?out|rtkaudio|sink_connect|sink_disconnect", re.I),
     "DSP": re.compile(rb"\bdsp\d*\b|eform_flush|rtk.?audio|rtaudio", re.I),
     "MUTE": re.compile(rb"\bmute\b|unmute|silenc", re.I),
-    "PROBLEM": re.compile(rb"\bfail(?:ed|ure)?\b|\berror\b|timeout|underrun|crash|hang|fatal|segfault|not.ready", re.I),
+    "PROBLEM_TERM": re.compile(rb"\bfail(?:ed|ure)?\b|\berror\b|timeout|underrun|crash|hang|fatal|segfault|not.ready", re.I),
+    "WARN_OR_ERROR_LEVEL": re.compile(rb"\buser\.(?:err|warning|crit)\b|\s(?:ERROR|WARN|CRITICAL)\s{2,}", re.I),
     "FLUSH": re.compile(rb"\bflush\b|\bseek\b|stream.?start", re.I),
 }
 ISO_UTC = re.compile(rb"2026-11-22T([012]\d):([0-5]\d):([0-5]\d)")
@@ -83,11 +85,11 @@ def scan() -> dict:
                         times[minute] += 1
                         minute_tags[minute].update(tags)
                         salient = (
-                            ("DTS" in tags and len(tags) > 1)
+                            ("DTS_CODEC" in tags and len(tags) > 1)
                             or ("AC3" in tags and "DECODER" in tags)
-                            or ("RESOURCE" in tags and "PROBLEM" in tags)
-                            or ("DSP" in tags and "PROBLEM" in tags)
-                            or ("AUDIO_ROUTE" in tags and "PROBLEM" in tags)
+                            or ("RESOURCE" in tags and "WARN_OR_ERROR_LEVEL" in tags)
+                            or ("DSP" in tags and "WARN_OR_ERROR_LEVEL" in tags)
+                            or ("AUDIO_ROUTE" in tags and "WARN_OR_ERROR_LEVEL" in tags)
                             or ("FLUSH" in tags and "DECODER" in tags)
                         )
                         if salient and seen_per_window[when] < 45:
