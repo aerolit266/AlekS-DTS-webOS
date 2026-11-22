@@ -444,3 +444,21 @@ Added [tools/audit-r188-replay-prereqs-r302.py](../tools/audit-r188-replay-prere
 **Recovery gate:** restore the original R122 header and the two owner-created pinned fixtures from their authoritative backup with identical SHA256 into persistent nonvolatile staging (not /tmp), then adapt isolated test harness to accept verified paths. Do **not** fabricate replacements and call the old 27/27/ASan/UBSan R188 QA passing; replacing fixtures or changing pins creates a NEW test lineage that must be named separately. Current R188 sanitizer test status = **BLOCKED**, not failed decoding.
 
 **Status:** R302 original-source audit and prerequisite checker ON VPS verified; original R188 ASan QA BLOCKED by missing dependencies; kitchen LG NOT TOUCHED and first-start DTS silence root cause still NOT VERIFIED.
+
+## R303 (2026-11-22): original R188 dependency recovery without altered SHA pins
+
+**Goal:** recover exact historical R122 header and two R171 owner-created DTS audio fixtures required by the original R188 ASan/UBSan laboratory QA after the Finnish VPS reboot. **No source file or fixture was fabricated, re-pinned, or inserted into the production system.**
+
+### Read-only source and archive discovery
+
+- Confirmed VPS hostname `mediarus.com`; `df -h /` still shows **94%** in use, approximately **6.1 GiB free**. Conserved disk capacity and avoided copying media or unpacking archives.
+- Searched only relevant explicit project/staging directories on VPS, a compact prior-source backup `/opt/gamefree24-vps-mcp/private-maintenance/old-source-backups-before-20261025-compact-20261101.tar.gz`, and relevant GitHub repository paths/commits (AlekS-DTS-webOS and AlekS-LG-65NANO896PC). **No SHA-matching original R122 header or R171 DTS 5.1/2.0 files were found** in those checked places. This is a scoped search, not evidence the files are nowhere else.
+- The archive can be opened, but the recovery scan found **0/3 matching originals** (`archives_opened=1`, `replay_ready=false`, exit2). Dry-run only; **no archive extraction or staging on VPS**.
+
+### Repeatable, fail-closed recovery helper
+
+Added [tools/recover-r188-original-pins-r303.py](../tools/recover-r188-original-pins-r303.py), final commit `05631e256ad5f5fb46a72368feea218a98946f25`, SHA256 `61bc17cb59ec79807a37bd00e153d09b38a47db0113f08a9b39ff3b79f2fd7dc`. It checks exactly the three expected historical SHA256 hashes and **accepts only explicit local source directories/files or tar/zip archives**; no systemwide search, network or TV connection. Archive member paths are not trusted or used for output; symlink, traversal and oversized entries are rejected, with a member count cap. Dry-run by default. Optional `--stage-dir` saves **only matched** files with exclusive-create, post-write verification, no overwrite of mismatched existing files, and rejects symlinks in staging parents. Does not touch any production paths.
+
+VPS validation: Python compile PASS; `--selftest` PASS for exact-hash source, original-like synthetic **test-only** fixtures, nested tar, ZIP member, malicious traversal, symlink archive entry, symlink staging ancestor, idempotent staging and existing-file hash conflict. Mock bytes are clearly **not** the original R171 fixtures. Applied on the real old compact backup **read-only**, match count 0, strict exit2 as expected.
+
+**Status:** R303 tool OFFLINE PASS. Actual R188 full sanitizer replay **BLOCKED: three original SHA-pinned prerequisites remain missing**. This does not prove an audio decoder defect or identify the kitchen LG first-start silence; kitchen TV and production R278 were not accessed or modified. If authoritative originals reappear, verify all hashes with R302/R303 and stage persistently before rerunning the exact old R188 QA. A new synthetic regression must have a distinct test identity and cannot be represented as the prior original 27/27 run.
