@@ -149,7 +149,7 @@ for label, url in ROUTES:
             print("OUTPUT_ADEC0_MAIN_MUTED=UNKNOWN")
             print("OUTPUT_ADEC0_MAIN_MODE=UNAVAILABLE")
     elif label == "CODEC":
-        codecs = [x.get("codec") for x in walk_objects(payload)]
+        codecs = [x["codec"] for x in walk_objects(payload) if "codec" in x]
         print("INPUT_CODEC_DTS=" + str(sum(c in ("dts", "DTS") for c in codecs)))
         print("INPUT_CODEC_AC3=" + str(sum(c in ("ac3", "AC3") for c in codecs)))
         print("INPUT_CODEC_FIELDS=" + str(len(codecs)))
