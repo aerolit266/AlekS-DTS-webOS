@@ -282,3 +282,29 @@ PulseAudio clients exposed via native socket `/var/run/pulse/native`:
 **R292 corrected source on LG** shows `pcm_output` sink #1 `module-alsa-sink.c`, `FORMAT=s16le 2ch 48000Hz`, `STATE=RUNNING` and its single active uncorked/unmuted input owned by WebAppMgr; read-only native LG audio service continues to report `source=ADEC0`, `sink=MAIN`, `muted=false`, `codec=dts`. No player interaction or system changes.
 
 **Next scientific gate:** only a captured failed first-start session, and comparison to this working topology, can justify an initialization change. A fully resolved data provenance would require target-specific native GStreamer audio sink tracing and/or safely instrumented IPC/PCM data path, not assumed from mapping, PIDs or hardware pointer movement. For now live DTS audible success is **owner-reported**, and all instrumented checks are non-acoustic.
+
+## R294 — independently verified kitchen LG reboot, installation survives and idle-vs-DTS reference (2026-11-22)
+
+Confirmed from the actual TV over GameFree24 VPS MCP V3 → AlekS Core task queue → TORMOZ SDK → existing `aleks-kitchen-root` access. At UTC `2026-11-22T04:35:28Z`, `/proc/uptime` was `484.30` seconds; approximate current boot epoch `04:27:24Z`. This is a **genuine TV boot since the previous active DTS observations**, not merely a media-process restart. `/tmp/aleks-dts-r289.sh` and `/tmp/aleks-dts-r292.sh` were missing, consistent with temporary filesystem reset, but uptime is the primary proof.
+
+The pinned read-only [tools/check-webos26-dts-runtime.sh](../tools/check-webos26-dts-runtime.sh) SHA256 `530c20a60df5c3af68144d5f9c2dde3d2b154b42dc64d8141fff0128f499318d` was downloaded fresh and verified ON TV. **PASS** installed.env/registry/plugin bundle SHA256, exact match `/var/systemd/system/env/umediaserver.env` to installed.env, `umediaserver.service=active` and all four values in the actual live uMS environment: `GST_PLUGIN_PATH_1_0`, `GST_REGISTRY_1_0`, `GST_REGISTRY_UPDATE`, `ALEKS_DTS_R130_ALLOW_AUTOPLUG`. Output `CONFIG_AND_PROCESS_ENV_PASS; NATIVE_AUDIO_NOT_YET_TESTED`. **This proves persistent installation and service environment after reboot, not that cold-first DTS has been heard.**
+
+R290 and R293 were run again after cold boot, with verified file SHA256, to establish an **idle/broadcast reference**: `codec=mpeg`, `source=ADEC1`, `sink=MAIN`, `muted=false`, `outputMode=null`, `soundOutput=tv_external_speaker`, volume23, `ALSA_PCM6=closed`, `pactl` active sink inputs 0. PulseAudio client `audiod` PID440 present; no direct active DTS Starfish client.
+
+Added unified read-only [tools/capture-webos26-audio-session-r294.sh](../tools/capture-webos26-audio-session-r294.sh), commit `826995766d571d1b3fdfc5634aba7bf68392cda3`, SHA256 `b90f4d27358264b85105be31bdb135b48e21c8f770509d35fc8dcf4a4355fb39`. VPS shell syntax PASS and no service/audio mutation commands, on-device SHA256 PASS and execution PASS. Real output at UTC `04:37:39Z` with uptime615s: services active, **STARFISH_PROCESSES=1**, **DTS_PLUGIN_HOLDERS=0**, PULSE_INPUT_COUNT=0, ALSA_PCM6=closed, codec=mpeg, native route ADEC1→MAIN, soundOutput tv_external_speaker. Classification `NO_DTS_PLUGIN_HOLDER_OBSERVED` is expected for this **non-DTS** session.
+
+| Signal | Working DTS session earlier (R289/R292) | New boot with no DTS playback (R294) |
+| --- | --- | --- |
+| Process with three AlekS DTS plugins mapped | Starfish PID20727 | None, one non-DTS Starfish process exists |
+| LG audio codec | dts | mpeg |
+| LG native source→sink | ADEC0→MAIN | ADEC1→MAIN |
+| PulseAudio active sink inputs | one WebAppMgr-owned input | zero |
+| ALSA PCM6 playback | RUNNING with increasing pointers | closed |
+| Selected sound output | tv_external_speaker | tv_external_speaker |
+| uMS/AOD services | active | active |
+
+**Interpretation:** This provides a real *non-DTS vs DTS* differential and a reference signature to detect whether a media player actually constructed the DTS path after a fresh boot. It does **NOT** prove that the historical silent first-start lacked this path: no snapshot was taken during the historical silence with these new probes. Codec=mpeg in the absence of PCM6 shows audio input property alone can describe a selected broadcast/input codec even if nothing is being rendered by PCM6.
+
+**Do not run a warm-up test in the native system before the next first-start user test:** that would destroy the opportunity to observe any cold-first initialization race. Do not start/stop the user's playback, system services, adjust PCM format, decoder ranks or firmware just to force a condition. If the owner opens a DTS movie, collect R294 with the exact SHA-pinned script *while the new session is present* and compare above. If the owner reports silence, capture before switching to AC3; later compare after switching. No background process or TV watchdog installed.
+
+**Status:** COLD BOOT DETECTED; DTS CONFIG AFTER REBOOT VERIFIED PASS; FIRST REAL DTS PLAYBACK AFTER THIS BOOT NOT VERIFIED; FIRST-SILENCE ROOT CAUSE UNKNOWN. All TV actions were non-destructive and read-only except staging the bounded diagnostic scripts under `/tmp`.
