@@ -414,3 +414,33 @@ Expanded [tools/test-webos26-r282-exit-r298.sh](../tools/test-webos26-r282-exit-
 **Interpretation guardrails:** A logged `Freeing pipeline` marker does not by itself prove internal resources were freed; lack of the marker does not prove a deadlock (process may have been killed by timeout). GNU vs BusyBox timeout exit statuses differ and real kitchen TV timeout implementation has **not** been established. No first-start silent/audible paired telemetry is available. None of the new QA tests accessed the kitchen LG or changed production code, audio, services, SSH or firmware. Prior platform denial was respected.
 
 **Next release gate (once direct TV diagnostics are allowed and owner initiates DTS playback):** first determine on LG which timeout is used, then capture bounded R282 timeline on a **separate isolated fixture**, never while interrupting the owner's film. If silence recurs, collect R294/R295 at the moment of silence before track switches and compare with the working output; root cause remains unverified.
+
+## R302 (2026-11-22): inspect first-frame metadata bridge and recover lab QA reproducibility
+
+**Scope:** source-level audit of old **experimental, not currently deployed** lab components `r184_gstaleksdtsstable.c`, `r186_gstaleksdtsbounded.c`, `r188_dts_framer.h`, `r188_gst_framer.c` on Finnish VPS. Kitchen LG's active R278 `libgstaleksdts16dec.so` and associated plugins are different; the R184/R186/R188 findings are NOT causal evidence for the kitchen silent first play.
+
+### First-frame path, existing source behavior
+
+- R184 metadata bridge probes only the **first input buffer** using `r122_dts_probe_be16`. On insufficient/invalid bytes, it sets `attempted=TRUE` and returns `GST_FLOW_OK`, leaving stream metadata unresolved until a new stream/flush boundary. No buffering/reassembly of encoded payload.
+- R186 improved metadata probe: retains at most an 11-byte header prefix and checks up to **8 incoming buffers**, clearing/reinitializing state on `GST_EVENT_STREAM_START` and `GST_EVENT_FLUSH_STOP`. Its source explicitly warns that this **does not repair a split encoded DTS frame**: the `GstBaseTransform` still forwards original input buffers in-place; it can validate metadata without constructing frame-aligned downstream packets.
+- R188 lab framer contains a bounded encoded-frame assembler (maximum 16 KiB per complete frame, max 1 MiB per feed) which buffers fragments and emits whole frames. Its lab plugin is `GST_RANK_NONE`; it is **not** the deployed kitchen decoder. Its event handler resets on `STREAM_START` and `FLUSH_STOP` and checks incomplete EOS. Existing R188 experiments/test history are not a substitute for on-device cold first-start A/B proof.
+
+**Research hypothesis, not an identified production bug:** if a real first DTS packet is fragmented and the active decoder chain lacks a suitable parser, downstream could see incomplete frame payload despite correct channel/rate metadata. Current LG observations do not show first-packet bytes, decoder element instances or sink ownership during *silent* session, and R278 internals are not demonstrated to match R186. Do not install a hypothetical framing fix or modify plugin ranks on this basis.
+
+### Concrete R188 QA infrastructure failure after VPS reboot
+
+Running existing `/opt/gamefree24-vps-mcp/src/r188_asan_ubsan_qa.py` on 2026-11-22 produced `R188_SANITIZER_TEST_FAILED_INVALID_SOURCE_PIN` **before GCC/ASan/UBSan launched**. The script hardcodes five SHA256-pinned dependencies. Verified **two persistent sources present and hash-exact**, while the other **three files below `/tmp` are missing** after a VPS reboot; this is NOT a DTS codec test failure:
+
+| ID | Pinned file | Observation |
+| --- | --- | --- |
+| R188 C header | `/opt/gamefree24-vps-mcp/src/r188_dts_framer.h` | SHA256 PASS |
+| R188 clock QA C | `/opt/gamefree24-vps-mcp/src/r188_clock_qa.c` | SHA256 PASS |
+| R122 parser header | `/tmp/aleks-r120-armel-qa/r122_dts_core_probe.h` | MISSING |
+| DTS 5.1 QA fixture | `/tmp/aleks-r171-sdk/qa/dts51-audioonly.mkv` | MISSING |
+| DTS 2.0 QA fixture | `/tmp/aleks-r171-sdk/qa/dts20-audioonly.mkv` | MISSING |
+
+Added [tools/audit-r188-replay-prereqs-r302.py](../tools/audit-r188-replay-prereqs-r302.py), commit `bf35123e69a777904eb722eb963fb530c8f1c637`, SHA256 `c6fe6c15e13892d2d709f57409483c4f3e47a121a0aa4ed41ea49ef4f0542c1d`. Stdlib-only, read-only checker verifies all five **original pins**, rejects symlinks and treats missing/mismatch/read errors separately. VPS `--selftest` **PASS** (missing, hash mismatch, symlink and result-guard cases). Real host `checked=5, sha256_pass=2, missing=3, mismatch=0`, classification `R188_QA_BLOCKED_BY_PREREQUISITES_NOT_A_DECODER_FAILURE`; `--strict` explicitly exits **2**, not a false PASS. No large media files copied or recreated. VPS root filesystem was 94% full with ~6.1 GiB free at capture, another reason not to duplicate large fixtures casually.
+
+**Recovery gate:** restore the original R122 header and the two owner-created pinned fixtures from their authoritative backup with identical SHA256 into persistent nonvolatile staging (not /tmp), then adapt isolated test harness to accept verified paths. Do **not** fabricate replacements and call the old 27/27/ASan/UBSan R188 QA passing; replacing fixtures or changing pins creates a NEW test lineage that must be named separately. Current R188 sanitizer test status = **BLOCKED**, not failed decoding.
+
+**Status:** R302 original-source audit and prerequisite checker ON VPS verified; original R188 ASan QA BLOCKED by missing dependencies; kitchen LG NOT TOUCHED and first-start DTS silence root cause still NOT VERIFIED.
