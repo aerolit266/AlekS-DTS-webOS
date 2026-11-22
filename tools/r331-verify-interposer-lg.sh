@@ -58,13 +58,13 @@ import sys,json
 folder=Path(sys.argv[1]); label=sys.argv[2]; before=int(sys.argv[3])
 files=sorted(folder.glob('r331-*.json'),key=lambda p:p.stat().st_mtime_ns)
 assert len(files)>before,(len(files),before)
-records=[json.loads(p.read_text()) for p in files]
+records=[json.loads(p.read_text()) for p in files[before:]]
 best=max(records,key=lambda r:(r.get('pcm_nonzero',0),r.get('be16_sync',0)))
 assert best['schema']=='aleks-dts-r331-interpose-v1'
 assert best['raw_pcm_exported'] is False and best['audio_files_created']==0
 assert best['pipeline_mutated'] is False
-assert best['input_buffers']>0 and best['be16_sync']>0
-assert best['pcm_buffers']>0 and best['pcm_sampled']>0
+assert best['input_buffers']==94 and best['be16_sync']==94
+assert best['pcm_buffers']==94 and best['pcm_sampled']==94*1024, (best['pcm_buffers'],best['pcm_sampled'])
 assert best['pcm_nonzero']>0 and best['pcm_rate']==48000
 assert best['pcm_channels']==(2 if label=='stereo' else 6)
 assert best['bad_maps']==0 and best['event_bytes']==0
