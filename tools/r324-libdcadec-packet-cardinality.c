@@ -1,6 +1,6 @@
 /* R324 — immutable R278 libdcadec packet cardinality proof.
  * SPDX-License-Identifier: MIT
- * Tested with decoded-only public DTS Core stereo fixture.
+ * Tested with public R278 DTS Core stereo and 5.1 fixtures.
  * No PCM/media recording and no system/device audio access.
  */
 #include <stdint.h>
@@ -9,7 +9,15 @@
 #include <string.h>
 #include "libdcadec/dca_context.h"
 
-enum { DTS_FRAME_BYTES = 1024, EXPECTED_BYTES = 96256, EXPECTED_FRAMES = 94 };
+#if defined(R324_SURROUND_51)
+enum { DTS_FRAME_BYTES = 2048, EXPECTED_BYTES = 192512,
+       EXPECTED_FRAMES = 94, EXPECTED_CHANNEL_MASK = 1551 };
+#define R324_TRACK "SURROUND_51"
+#else
+enum { DTS_FRAME_BYTES = 1024, EXPECTED_BYTES = 96256,
+       EXPECTED_FRAMES = 94, EXPECTED_CHANNEL_MASK = 3 };
+#define R324_TRACK "STEREO"
+#endif
 
 struct result {
     int parse_ok;
@@ -71,6 +79,7 @@ int main(int argc, char **argv) {
         frames++;
     }
     if (frames != EXPECTED_FRAMES) return 2;
+    printf("R324_TRACK=%s\n", R324_TRACK);
     printf("R324_FIXTURE_FULL_FRAMES=%d\n", frames);
 
     static const size_t lens[] = { 11, 97, 512, 1024, 2048, 4096 };
@@ -80,7 +89,7 @@ int main(int argc, char **argv) {
         int should_decode = lens[i] >= DTS_FRAME_BYTES;
         int pass = should_decode
                  ? r.parse_ok && r.pcm_ok && r.samples == 512 &&
-                   r.samplerate == 48000 && r.channelmask == 3
+                   r.samplerate == 48000 && r.channelmask == EXPECTED_CHANNEL_MASK
                  : !r.parse_ok && !r.pcm_ok;
         printf("R324_INPUT_BYTES=%zu PARSE=%s PCM_SAMPLES_PER_CHANNEL=%d EXPECTED=%s RESULT=%s\n",
                lens[i], r.parse_ok ? "ACCEPT" : "REJECT", r.samples,
@@ -105,7 +114,7 @@ int main(int argc, char **argv) {
         int samples = 0, channels = 0, rate = 0, bits = 0, profile = 0;
         if (dcadec_context_filter(sequential, &pcm, &samples,
                                   &channels, &rate, &bits, &profile) < 0 ||
-            !pcm || samples != 512 || channels != 3 || rate != 48000) break;
+            !pcm || samples != 512 || channels != EXPECTED_CHANNEL_MASK || rate != 48000) break;
         total_samples += samples;
         decoded++;
     }
@@ -119,17 +128,17 @@ int main(int argc, char **argv) {
            complete_pass ? "PASS" : "FAIL");
     success &= complete_pass;
 
-    struct result broken = decode(encoded, count, 1024, 1);
+    struct result broken = decode(encoded, count, DTS_FRAME_BYTES, 1);
     int reject_ok = !broken.parse_ok && !broken.pcm_ok;
     printf("R324_CORRUPT_FIRST_FRAME_REJECT=%s\n", reject_ok ? "PASS" : "FAIL");
     success &= reject_ok;
 
-    /* A 4096-byte buffer contains 4 DTS Core frames. This direct API
-     * decoded 512 samples, not 2048: the caller must split frames and
-     * invoke parse/filter for each, preserving timestamps. This is
-     * a property of the tested API; it does not establish what Lampa sends.
-     */
-    puts("R324_4096_BYTE_BUFFER_DECODED_FRAMES=1_OF_4");
+    /* A 4096-byte buffer contains 2 or 4 complete DTS Core frames,
+     * depending on the track. A single parse/filter yields only 512 PCM
+     * samples on this exact R278 fixture. The caller must split frames
+     * and preserve their timestamps. Lampa's live input is unobserved. */
+    printf("R324_4096_BYTE_BUFFER_DECODED_FRAMES=1_OF_%d\n",
+           4096 / DTS_FRAME_BYTES);
     puts("R324_PRODUCTION_OR_TV_MODIFIED=NO");
     puts(success ? "RESULT=R324_LIBDCADEC_CARDINALITY_PASS"
                  : "RESULT=R324_LIBDCADEC_CARDINALITY_FAIL");
