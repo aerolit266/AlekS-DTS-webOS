@@ -6,7 +6,7 @@ set -eu
 umask 077
 LC_ALL=C
 export LC_ALL
-for tool in sha256sum tar gcc make ffmpeg mktemp timeout; do
+for tool in sha256sum tar gcc make python3 mktemp timeout; do
     command -v "$tool" >/dev/null 2>&1 || {
         echo "R324_MISSING_DEPENDENCY=$tool"
         exit 2
@@ -39,8 +39,34 @@ tar -xOzf "$release" fixtures/dts-stereo.mka >"$tmp/dts-stereo.mka"
 printf '%s  %s\n' \
     7b49fee09f78add1fb27afd404dc7ec229f4950e5803c081e1068b6d245587ae \
     "$tmp/dts-stereo.mka" | sha256sum -c - >/dev/null
-timeout 15 ffmpeg -hide_banner -loglevel error -nostdin \
-    -i "$tmp/dts-stereo.mka" -map 0:a:0 -c:a copy -f dts "$tmp/dts-encoded.raw"
+# The exact public fixture contains 94 independent 1024-byte DTS Core
+# packets. Recover *only this SHA256-pinned fixture's* frame payloads with
+# Python stdlib; verify the encoded output against independent FFmpeg
+# stream-copy SHA256 (measured during R324 on VPS). No codec tools needed.
+python3 - "$tmp/dts-stereo.mka" "$tmp/dts-encoded.raw" <<'PY'
+import hashlib
+from pathlib import Path
+import sys
+
+source = Path(sys.argv[1]).read_bytes()
+sync = bytes.fromhex("7ffe8001")
+positions = []
+offset = 0
+while True:
+    index = source.find(sync, offset)
+    if index < 0:
+        break
+    positions.append(index)
+    offset = index + len(sync)
+if len(positions) != 94 or any(k + 1024 > len(source) for k in positions):
+    raise SystemExit("R324_MATROSKA_FRAME_COUNT_MISMATCH")
+encoded = b"".join(source[k:k + 1024] for k in positions)
+digest = hashlib.sha256(encoded).hexdigest()
+if digest != "282d15e11221524f6af40f4202ec6d2a3813d2a12a49de904e7cdfc0c4ce9bda":
+    raise SystemExit("R324_ENCODED_DTS_REFERENCE_SHA_MISMATCH")
+Path(sys.argv[2]).write_bytes(encoded)
+print("R324_FFMPEG_INDEPENDENT_RAW_SHA=PASS")
+PY
 gcc -std=c11 -O2 -Wall -Wextra -Werror \
     -I"$tmp/dcadec" "$src" "$tmp/dcadec/libdcadec/libdcadec.a" \
     -lm -o "$tmp/probe"
