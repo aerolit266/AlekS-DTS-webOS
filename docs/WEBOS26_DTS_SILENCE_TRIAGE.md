@@ -308,3 +308,31 @@ Added unified read-only [tools/capture-webos26-audio-session-r294.sh](../tools/c
 **Do not run a warm-up test in the native system before the next first-start user test:** that would destroy the opportunity to observe any cold-first initialization race. Do not start/stop the user's playback, system services, adjust PCM format, decoder ranks or firmware just to force a condition. If the owner opens a DTS movie, collect R294 with the exact SHA-pinned script *while the new session is present* and compare above. If the owner reports silence, capture before switching to AC3; later compare after switching. No background process or TV watchdog installed.
 
 **Status:** COLD BOOT DETECTED; DTS CONFIG AFTER REBOOT VERIFIED PASS; FIRST REAL DTS PLAYBACK AFTER THIS BOOT NOT VERIFIED; FIRST-SILENCE ROOT CAUSE UNKNOWN. All TV actions were non-destructive and read-only except staging the bounded diagnostic scripts under `/tmp`.
+
+## R295/R296 2026-11-22: native audio policy API research and offline first-start comparator
+
+### Current access limitation
+
+An attempted read-only LG R294 snapshot through the previously working AlekS Core → TORMOZ → `ares-novacom` route was **blocked before execution by the platform's security controls**. Do **not** label that attempt PASS or route around the denial via an alternative bridge. No new measurement of the TV was collected in this phase, and the most recent verified on-TV evidence remains the post-reboot R294 idle snapshot. All actions below were GitHub/VPS **offline only**.
+
+### New evidence from official webOS OSE API documentation
+
+- [com.webos.service.audiooutput](https://www.webosose.org/docs/reference/ls2-api/com-webos-service-audiooutput/) describes a stateless HAL-facing audiooutput service and gives a **successful getStatus response with `outputMode:"null"`**. This field alone cannot establish audio silence. Official docs warn that application developers must not control audiooutput directly; we use **read-only** getStatus only.
+- [com.webos.service.audio](https://www.webosose.org/docs/reference/ls2-api/com-webos-service-audio/) documents `UMI/getStatus` (audio resource connections, `audio.query`) and `getStreamStatus` (stream policy/active/mute status, API level12). These methods describe OSE; **consumer LG service signatures and permissions may differ** and have not been verified on the kitchen TV.
+- [com.webos.service.avoutput](https://www.webosose.org/docs/reference/ls2-api/com-webos-service-avoutput/) documents `ADEC` / `MAIN` source/sink terminology; relevant historical interfaces are deprecated/retired and were not invoked.
+
+### New read-only R295, staged only
+
+[tools/inspect-webos26-audio-policy-r295.sh](../tools/inspect-webos26-audio-policy-r295.sh), commit `3d71e50687b83a1e28a80ee0bafc5c3f04943e69`, SHA256 `655fef7e918edae9b73c84b433c6a5ab2ad3c4bada4319c258147236f767fe98`. Only queries `audio/UMI/getStatus`, `audio/getStreamStatus` with `subscribe:false`, `audiooutput/audio/getStatus`, `audio/tv/getAudioInputProperty` using bounded `luna-send`. Prints only allowlisted scalar fields and counts, no full payload, session IDs, title, URLs, or media paths. Its flattened fields **do not preserve array-object linkage**: do not claim a source, mute flag and streamType all belong to one connection. VPS `sh -n` PASS; a synthetic JSON matching known field formats is parsed correctly. **ON-TV TEST NOT PERFORMED** due to the access restriction noted above.
+
+### R296 offline differential comparator, verified
+
+[tools/compare-webos26-dts-sessions-r296.py](../tools/compare-webos26-dts-sessions-r296.py), commit `8e74e5eed7a99f1f06395100e98a851b0f7f1cf0`, SHA256 `c455a48606e4486e3583a13673055148dd18c4b6197344ca16fce197d05e8223`. Python stdlib only, reads two user-supplied R294/R295 transcripts from local files and emits only known fields and differences. Separate hearing labels `--heard-before` / `--heard-after` default `unknown`; always reports `root_cause_verified=false`. Tests on VPS: `py_compile` PASS, `--selftest` PASS with 5 synthetic assertions (silent/working/idle and inference guard). No TV access, source audio or remote command in comparator.
+
+Usage example (offline, after independently collecting paired samples): `python3 tools/compare-webos26-dts-sessions-r296.py before.txt after.txt --heard-before no --heard-after yes`. Absent/null fields remain unknown, not assumed FAIL.
+
+### Data-backed working hypothesis — not root-cause proof
+
+During prior owner-reported **silent** playback (R280/R283), three AlekS DTS shared libraries were mapped and LG API said `codec=dts`. During owner-reported **audible** playback (R289/R292), both remained true, while PCM, PulseAudio and ADEC route metadata were finally measured. Therefore **codec detection and .so mapping alone do not distinguish the two states**. A future concurrent silent→audible comparison must capture resource connections, native sink state, muted flags and timeline of audio creation. Existing historical traces do not determine whether the silent session had a missing ADEC grant, incorrectly initialized sink, empty samples, or another player race.
+
+**Production and safety status:** no firmware, service, SSH, decoder priority, ALSA, PulseAudio or video playback changes. R295 is STAGED/NOT ON-TV VERIFIED; R296 OFFLINE PASS; first DTS startup after the last LG boot remains NOT VERIFIED.
