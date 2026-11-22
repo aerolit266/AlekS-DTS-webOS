@@ -100,6 +100,25 @@ static gboolean event_sink(GstPad *pad,GstObject *parent,GstEvent *event) {
     gst_event_unref(event);
     return TRUE;
 }
+/*
+ * A hand-made capture sink has no pad template. The default CAPS query can
+ * falsely advertise only the previously negotiated format; that would
+ * reject legitimate dynamic rate/channel changes in the lab harness.
+ * Model an actual flexible downstream that accepts audio/x-dts caps.
+ */
+static gboolean downstream_query(GstPad *pad,GstObject *parent,GstQuery *query) {
+    if(GST_QUERY_TYPE(query)==GST_QUERY_ACCEPT_CAPS) {
+        gst_query_set_accept_caps_result(query,TRUE);
+        return TRUE;
+    }
+    if(GST_QUERY_TYPE(query)==GST_QUERY_CAPS) {
+        GstCaps *caps=gst_caps_new_empty_simple("audio/x-dts");
+        gst_query_set_caps_result(query,caps);
+        gst_caps_unref(caps);
+        return TRUE;
+    }
+    return gst_pad_query_default(pad,parent,query);
+}
 static Rig create_rig(void) {
     Rig r={0};
     r.framer=gst_element_factory_make("aleksdtsr188framer",NULL);
@@ -113,6 +132,7 @@ static Rig create_rig(void) {
     return r;
 }
 static void start_rig(Rig *r) {
+    gst_pad_set_query_function(r->down,GST_DEBUG_FUNCPTR(downstream_query));
     gst_pad_set_chain_function(r->down,GST_DEBUG_FUNCPTR(receive));
     gst_pad_set_event_function(r->down,GST_DEBUG_FUNCPTR(event_sink));
     g_object_set_data(G_OBJECT(r->down),"rig",r);
