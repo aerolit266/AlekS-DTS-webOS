@@ -163,6 +163,21 @@ def main():
             src = ["filesrc", "blocksize=1024",
                    "location=" + str(raw), "!", caps]
             test_decoder("RAW_1024_" + suffix, src, env)
+        # Does a timestamp/segment normalizer restore frame-aligned raw DTS?
+        # GstIdentity is stock and operates only in the isolated child.
+        # datarate is the known compressed byte rate of this public test.
+        for suffix, ident in (
+            ("PTS", ["datarate=" + str(raw.stat().st_size)]),
+            ("TIME_SEGMENT", ["single-segment=true"]),
+            ("PTS_TIME_SEGMENT",
+             ["datarate=" + str(raw.stat().st_size),
+              "single-segment=true"]),
+        ):
+            src = ["filesrc", "blocksize=1024",
+                   "location=" + str(raw), "!",
+                   "audio/x-dts,channels=2,rate=48000", "!",
+                   "identity"] + ident
+            test_decoder("RAW_1024_" + suffix, src, env)
     print("R323_PRODUCTION_SERVICE_MODIFIED=NO")
     print("R323_LIVE_LAMPA_PCM=UNOBSERVED")
     print("RESULT=R323_NATIVE_RAW_DTS_FRAGMENTATION_DIFFERENTIAL_COMPLETE")
