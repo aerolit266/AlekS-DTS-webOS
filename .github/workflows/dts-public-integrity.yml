@@ -37,3 +37,9 @@ jobs:
           python3 tools/r326-pulse-monitor-energy.py selftest
           python3 tools/r327-real-dts-pair-compare.py --selftest
           python3 tools/r328-native-audio-route-readonly.py selftest
+      - name: Verify R329 isolated pad probe tooling parses cleanly
+        run: |
+          sh -n tools/run-r329-isolated-pad-probe-lab.sh
+          sh -n tools/build-r329-armel-pad-probe-lab.sh
+          python3 -c "import ast,pathlib; ast.parse(pathlib.Path('tools/r329-stage-public-fixtures.py').read_text())"
+
