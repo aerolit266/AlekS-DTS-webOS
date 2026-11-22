@@ -79,5 +79,41 @@ query() {
 }
 query CODEC 'luna://com.webos.service.audio/tv/getAudioInputProperty'
 query OUTPUT 'luna://com.webos.service.audiooutput/audio/getStatus'
+echo '=== LAST 4 MIN NATIVE MEDIA ERROR COUNTS (LOG CONTENT NOT PRINTED) ==='
+# Distinguish an early R130 CAPS/header guard failure from output routing.
+# Events from other processes can also be counted: no pid/stream ownership.
+if command -v journalctl >/dev/null 2>&1 && command -v timeout >/dev/null 2>&1;then
+  lines=$(timeout 7 journalctl --since '-4 min' --no-pager -n 400 -o cat 2>/dev/null)
+  rc=$?
+  if [ "$rc" -eq 0 ];then
+    printf '%s\n' "$lines" | awk '
+      BEGIN { limit=0;missing=0;unrecognized=0;negotiate=0;sink=0;decoder=0;total=0 }
+      {
+        total++
+        row=tolower($0)
+        if(index(row,"dts initial event limit reached"))limit++
+        if(index(row,"dts without input caps"))missing++
+        if(index(row,"unrecognized dts input caps"))unrecognized++
+        if(index(row,"not-negotiated"))negotiate++
+        if(index(row,"failed to acquire") || index(row,"failed to open audio") ||
+           index(row,"audiooutput error"))sink++
+        if(index(row,"dcadec") && (index(row,"error") || index(row,"fail")))decoder++
+      }
+      END {
+        printf "NATIVE_EVENT_ROWS=%d\n",total
+        printf "R130_INITIAL_EVENT_LIMIT=%d\n",limit
+        printf "R130_NO_INPUT_CAPS=%d\n",missing
+        printf "R130_UNRECOGNIZED_CAPS=%d\n",unrecognized
+        printf "GST_NOT_NEGOTIATED=%d\n",negotiate
+        printf "NATIVE_AUDIO_SINK_ERROR_HINT=%d\n",sink
+        printf "DCADEC_ERROR_HINT=%d\n",decoder
+      }'
+    echo 'NATIVE_LOG_COUNTS=AVAILABLE_NOT_ATTRIBUTED_TO_A_SINGLE_MEDIA_STREAM'
+  else
+    printf 'NATIVE_LOG_COUNTS=UNAVAILABLE_EXIT_%s\n' "$rc"
+  fi
+else
+  echo 'NATIVE_LOG_COUNTS=UNAVAILABLE_NO_JOURNAL_TOOL'
+fi
 echo 'RESULT=R308_READ_ONLY_CAPTURE_COMPLETE'
 echo 'NOTE=No media audio samples recorded; PCM pointer movement does not prove DTS audibility.'
