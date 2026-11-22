@@ -1,0 +1,29 @@
+name: AlekS DTS R341 isolated GstEvent adapter QA
+
+on:
+  push:
+    branches:
+      - lab/r341-gst-grant-bridge
+    paths:
+      - tools/r341-*
+      - docs/R341_GSTREAMER_GRANT_BRIDGE_LAB.md
+      - .github/workflows/r341-isolated-gst-qa.yml
+  pull_request:
+    paths:
+      - tools/r341-*
+      - docs/R341_GSTREAMER_GRANT_BRIDGE_LAB.md
+      - .github/workflows/r341-isolated-gst-qa.yml
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-gst-pad:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install GStreamer *development headers* on disposable CI runner
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends libgstreamer1.0-dev pkg-config
+      - name: Normal and ASan/UBSan host-only pad regression
+        run: bash tools/r341-qa.sh
