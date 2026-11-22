@@ -23,7 +23,7 @@ MAX_LINES = 250000
 PATTERNS = {
     "DTS_CODEC": re.compile(rb"audio/x-dts|\bA_DTS\b|\baleksdts\w*|\bdtsdec\b|(?:codec|audio-format)[=: ]{1,16}dts(?:-hd)?\b", re.I),
     "DTS_SEAMLESS_FLAG": re.compile(rb"\bdts-seamless\b", re.I),
-    "AC3": re.compile(rb"\bac-?3\b|eac3|dolby", re.I),
+    "AC3": re.compile(rb"\bac-?3\b|eac3|omxac3dec(?:bin)?|dolby", re.I),
     "DECODER": re.compile(rb"decproxy|(?:audio|gst).*decod|\badec\b|fakeadec", re.I),
     "RESOURCE": re.compile(rb"acquired.?resource|resource.?acquir|grant|allocat|release.?resource", re.I),
     "AUDIO_ROUTE": re.compile(rb"audiooutputd|audio.?sink|audio.?route|sound.?out|rtkaudio|sink_connect|sink_disconnect", re.I),
