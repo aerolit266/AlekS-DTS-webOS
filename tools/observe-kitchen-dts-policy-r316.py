@@ -89,6 +89,11 @@ def print_count(prefix, rows):
     print(prefix + "_MUTED_TRUE=" + str(sum(muted)))
     print(prefix + "_ADEC0_MAIN=" + str(sum(
         r.get("source") == "ADEC0" and r.get("sink") == "MAIN" for r in clean)))
+    for cls in ("ADEC1", "AMIXER"):
+        print(prefix + "_" + cls + "_MAIN=" + str(sum(
+            r.get("source") == cls and r.get("sink") == "MAIN" for r in clean)))
+    print(prefix + "_ACTIVE_MAIN=" + str(sum(
+        r.get("sink") == "MAIN" and r.get("activeStatus") is True for r in clean)))
 
 def walk_objects(root):
     # Read bounded nested JSON objects. Unknown keys and values never reach stdout.
@@ -144,7 +149,7 @@ for label, url in ROUTES:
                       ("null" if "outputMode" in selected else "UNAVAILABLE"))
             else:
                 print("OUTPUT_ADEC0_MAIN_MODE=" +
-                      safe_enum(mode, ("alsa", "pcm", "passthrough", "auto")))
+                      safe_enum(mode, ("alsa", "pcm", "passthrough", "auto", "null")))
         else:
             print("OUTPUT_ADEC0_MAIN_MUTED=UNKNOWN")
             print("OUTPUT_ADEC0_MAIN_MODE=UNAVAILABLE")
