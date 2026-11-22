@@ -137,6 +137,10 @@ def main():
         TV_STAGE = Path("/tmp/aleks-r325-timesegment-20261122")
         EXPECTED_PLUGIN = "e90242c3559e7d5586f8d64995a2b81dd0299cd67c38fb46f09af1caae5e8863"
         candidate = "TIMESEGMENT_ONLY"
+    elif len(sys.argv) == 2 and sys.argv[1] == "repro":
+        TV_STAGE = Path("/tmp/aleks-r325-repro-20261122")
+        EXPECTED_PLUGIN = "c230709fcebe8175c254557a7c30858fe71219894a018aeac54cdd07ea6157f8"
+        candidate = "REPRODUCIBLE_TIMESEGMENT"
     elif len(sys.argv) == 1:
         candidate = "R312_ORIGINAL"
     else:
@@ -203,7 +207,32 @@ def main():
                 if abs(result[1] - reference[1]) >= 0.10:
                     raise ValueError("PCM_AMPLITUDE_REFERENCE_MISMATCH")
                 cases += 1
+            # Negative controls: malformed or truncated *public* DTS Core.
+            # The framer must report a pipeline error, not silently treat
+            # the bad bytes as a valid full-frame stream.
+            bad = bytearray(raw)
+            bad[0] ^= 0xFF
+            negative = (
+                ("BAD_SYNC", bytes(bad), "R188 invalid or unframeable DTS Core buffer"),
+                ("TRUNCATED_EOS", raw[:-13], "R188 incomplete DTS Core frame at EOS"),
+            )
+            for kind, bad_raw, expected_error in negative:
+                path = root / (label.lower() + "-" + kind.lower() + ".dts")
+                path.write_bytes(bad_raw)
+                chain = [
+                    gst, "-m", "-v", "filesrc",
+                    "location=" + str(path), "blocksize=11",
+                    "!", "audio/x-dts", "!", "aleksdtsr188framer",
+                    "!", "queue", "!", "decodebin"
+                ] + common
+                exit_code, log = call(chain, env)
+                rejected = exit_code != 0 and expected_error in log
+                print("R325_" + label + "_" + kind + "_FAIL_CLOSED=" +
+                      ("PASS" if rejected else "FAIL"))
+                if not rejected:
+                    raise ValueError("NEGATIVE_CASE_NOT_REJECTED_" + kind)
         print("R325_FRAMER_GST124_CASES_PASS=" + str(cases) + "_OF_8")
+        print("R325_FRAMER_NEGATIVE_CASES_PASS=4_OF_4")
     print("R325_LAMPA_COLD_START=NOT_OBSERVED")
     print("R325_R278_SERVICES_OR_LIBRARIES_CHANGED=NO")
     print("RESULT=R325_REAL_LG_ISOLATED_FRAMER_QA_PASS")
