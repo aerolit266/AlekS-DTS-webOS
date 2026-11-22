@@ -132,3 +132,31 @@ jobs:
           assert 'R338_LG_ISOLATED_REAL_R278_SINK_2_OF_2_PASS' in qa
           print('RESULT=R338_OBSERVER_CONTROLLER_STAGE_CONSISTENCY_PASS')
           PY
+      - name: Validate R340 fail-closed hardware resource epoch model
+        run: |
+          set -eu
+          d=$(mktemp -d)
+          trap 'rm -rf -- "$d"' EXIT
+          cc -std=c99 -O2 -Wall -Wextra -Werror -pedantic -fstack-protector-strong \
+            tools/r340-resource-grant-epoch-model.c -o "$d/r340-resource-model"
+          timeout 25 "$d/r340-resource-model" | tee "$d/result.txt"
+          grep -Fq 'R340_DETERMINISTIC=15/15 PASS' "$d/result.txt"
+          grep -Fq 'R340_FUZZ=25000*40 PASS' "$d/result.txt"
+          grep -Fq 'RESULT=R340_PURE_C99_GRANT_REPLAY_MODEL_15_AND_1M_PASS' "$d/result.txt"
+          python3 tools/r340-ums-readonly-pipeline-audio.py selftest
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path('tools/r340-resource-grant-epoch-model.c').read_text()
+          for marker in (
+             'R340_SOFTWARE_CHILD_NEW', 'R340_POLICY_SUSPEND',
+             'R340_POLICY_RESUME', 'R340_REPLAY_CACHED_GRANT',
+             'R340_FORWARD_ORIGINAL_GRANT', 'R340_CHILD_GONE',
+             'R340_FLUSH_START', 'R340_FLUSH_STOP', 'R340_RELEASE',
+             'R340_UNLOAD', 'R340_GRANT', 'R340_DTS_CAPS'
+          ):
+             assert marker in src, marker
+          assert 'gst_pad_push_event' not in src
+          assert 'gst_pad_push' not in src
+          assert 'system(' not in src
+          print('RESULT=R340_OFFDEVICE_MODEL_NO_PRODUCTION_ACTION_PASS')
+          PY
