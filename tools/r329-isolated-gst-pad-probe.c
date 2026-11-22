@@ -310,8 +310,17 @@ int main(int argc, char **argv) {
         }
     }
     gst_element_set_state(pipe, GST_STATE_NULL);
+    /* Actual LG R278 decodebin uses opaque audio/x-unknown CAPS at its
+       external sink even when all 94 BE16 DTS frames are decoded by the
+       checksum-verified installed wrapper. Accept ONLY that native-specific
+       observed contract, never an arbitrary unknown media type. */
+    gboolean caps_ok = native ?
+        (stats.caps_events > 0 &&
+         g_strcmp0(stats.first_input_caps_family, "audio/x-unknown") == 0) :
+        (stats.caps_dts > 0 &&
+         g_strcmp0(stats.first_input_caps_family, "audio/x-dts") == 0);
     int ok = eos && !error_event && stats.stream_events > 0 &&
-        stats.caps_dts > 0 && stats.segment_time > 0 &&
+        caps_ok && stats.segment_time > 0 &&
         stats.segment_bytes == 0 && stats.segment_other == 0 &&
         stats.order_violations == 0 && stats.bad_input_map == 0 &&
         stats.bad_pcm_map == 0 && stats.input_buffers == 94 &&
