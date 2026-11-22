@@ -23,6 +23,8 @@ sh /tmp/aleks-dts-compat.sh
 
 Присылайте в [Issues](https://github.com/aerolit266/AlekS-DTS-webOS/issues) модель, webOS, фактический ELF ABI, GStreamer, статус встроенного AC3 и тестовый результат. Секреты, ключи SSH, содержимое `umediaserver.env` и приватные данные **не публикуйте**.
 
+**R294 — новая перезагрузка LG (22.11.2026):** по `/proc/uptime` установлена реальная новая загрузка кухонного телевизора (~04:27:24 UTC). После неё SHA256 плагинов/реестра, `umediaserver.env` и все четыре переменные живого `umediaserver` прошли проверку. В сессии без DTS: `codec=mpeg`, `ADEC1→MAIN`, ALSA PCM6 closed, активных PulseAudio-входов 0 и Starfish с DTS-плагинами не обнаружено. Это нормальный контрольный снимок, **не проверка первого DTS-воспроизведения после загрузки**. [R294](tools/capture-webos26-audio-session-r294.sh).
+
 **R293 — клиенты PulseAudio:** `audiod` PID440 и `WebAppMgr` PID3217; прямого PulseAudio-клиента `starfish-media` PID20727 не обнаружено. Это указывает на **неподтверждённый промежуточный маршрут** между DTS и PCM-выходом. Следовательно, исправность DTS-декодирования подтверждена изолированно, реальный звук — владельцем; низкоуровневая цепочка не сертифицирована. [R293](tools/inspect-webos26-pulse-clients-r293.sh).
 
 **R292 — уточнение источника PCM:** единственный активный PulseAudio sink-input принадлежит `WebAppMgr` PID3217, а DTS плагины загружены в `starfish-media` PID20727. Аппаратный ALSA-выход активен, но **не прослежена прямая цепочка DTS → PulseAudio → ALSA**; R286–R291 нельзя использовать как независимый тест содержимого DTS-PCM. Реальный звук подтверждён пользователем. [R292](tools/inspect-webos26-pulse-dts-r292.sh).
