@@ -79,6 +79,8 @@ static pthread_mutex_t mu=PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t io_mu=PTHREAD_MUTEX_INITIALIZER;
 static atomic_int enabled=ATOMIC_VAR_INIT(0);
 static atomic_ulong last_dts_sec=ATOMIC_VAR_INIT(0);
+static atomic_uintptr_t selected_converter_pad=ATOMIC_VAR_INIT((uintptr_t)0);
+static atomic_ulong selected_converter_seen=ATOMIC_VAR_INIT(0);
 static unsigned long started_at=0;
 static int qa_mode=0;
 static char output_path[192];
@@ -262,6 +264,12 @@ static void record_pcm(GstPad *pad,GstBuffer *buffer,int from_converter) {
 }
 static void record_event(GstEvent *event) {
   if(!event)return;
+  if(GST_EVENT_TYPE(event)==GST_EVENT_STREAM_START) {
+    /* A newly started DTS stream may use a different downstream convert pad.
+       Clear only the pad selector, not aggregate telemetry. */
+    atomic_store_explicit(&selected_converter_pad,(uintptr_t)0,memory_order_relaxed);
+    atomic_store_explicit(&selected_converter_seen,0,memory_order_relaxed);
+  }
   pthread_mutex_lock(&mu);
   switch(GST_EVENT_TYPE(event)) {
     case GST_EVENT_STREAM_START:stats.event_start++;break;
@@ -394,7 +402,23 @@ GstFlowReturn gst_pad_push(GstPad *pad,GstBuffer *buffer) {
         pthread_mutex_lock(&mu);
         int direct=stats.pcm_wrapper_buffers>0;
         pthread_mutex_unlock(&mu);
-        if(!direct)record_pcm(pad,buffer,1);
+        if(!direct) {
+          /* LG exposes several sequential audioconvert pads; count only one
+             per DTS stream to avoid double RMS/sample accounting. */
+          const unsigned long now=mono_seconds();
+          uintptr_t chosen=atomic_load_explicit(&selected_converter_pad,memory_order_relaxed);
+          const unsigned long seen=atomic_load_explicit(&selected_converter_seen,memory_order_relaxed);
+          if(chosen && seen && now-seen>5) {
+            uintptr_t expected=chosen;
+            atomic_compare_exchange_strong(&selected_converter_pad,&expected,(uintptr_t)0);
+          }
+          uintptr_t empty=(uintptr_t)0;
+          atomic_compare_exchange_strong(&selected_converter_pad,&empty,(uintptr_t)pad);
+          if(atomic_load_explicit(&selected_converter_pad,memory_order_relaxed)==(uintptr_t)pad) {
+            record_pcm(pad,buffer,1);
+            atomic_store_explicit(&selected_converter_seen,now,memory_order_relaxed);
+          }
+        }
       }
     }
   }
