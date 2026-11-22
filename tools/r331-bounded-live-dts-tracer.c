@@ -79,6 +79,8 @@ static gboolean wrapper_pad(GstPad *pad, gboolean *is_sink) {
   const char *feature = factory ? gst_plugin_feature_get_name(GST_PLUGIN_FEATURE(factory)) : NULL;
   gboolean match = (cls && g_str_has_prefix(cls, "AlekSDts16Dec")) ||
                    (feature && g_strcmp0(feature, "aleksdts16dec") == 0);
+  if (!match && g_strcmp0(g_getenv("ALEKS_R331_ISOLATED_QA"), "YES") == 0)
+    match = feature && g_strcmp0(feature, "dtsdec") == 0;
   if (match && is_sink) *is_sink = GST_PAD_DIRECTION(pad) == GST_PAD_SINK;
   gst_object_unref(owner);
   return match;
@@ -284,7 +286,7 @@ static void aleks_r331_tracer_init(AlekSR331Tracer *s) {
   gboolean qa=mode && g_strcmp0(mode,"YES")==0;
   char comm[64]={0};
   FILE *f=fopen("/proc/self/comm","r");
-  if(f) { (void)fgets(comm,sizeof(comm),f); fclose(f); }
+  if(f) { if (!fgets(comm,sizeof(comm),f)) comm[0]=0; fclose(f); }
   if(!g_str_has_prefix(comm,"starfish-media-") && !qa) return;
   const gchar *destdir=qa?g_getenv("ALEKS_R331_QA_DIR"):"/run/aleks-r331/metrics";
   if(!destdir) return;
