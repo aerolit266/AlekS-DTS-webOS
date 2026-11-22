@@ -36,3 +36,4 @@ jobs:
           python3 tools/r326-passive-pulseaudio-alsa-snapshot.py selftest
           python3 tools/r326-pulse-monitor-energy.py selftest
           python3 tools/r327-real-dts-pair-compare.py --selftest
+          python3 tools/r328-native-audio-route-readonly.py selftest
