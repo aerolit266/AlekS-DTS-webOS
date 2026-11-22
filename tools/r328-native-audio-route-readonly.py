@@ -248,6 +248,24 @@ def pcm_status():
     return rows
 
 
+def audio_diag_groups():
+    # Inventory of tracepoint *names only*, never enable/read trace buffers.
+    roots = ("/sys/kernel/tracing/events", "/sys/kernel/debug", "/proc/driver")
+    result = {}
+    for root in roots:
+        try:
+            names = os.listdir(root)[:1024]
+        except OSError:
+            result[root] = {"available": False, "audio_groups": []}
+            continue
+        filtered = [name for name in names
+                    if re.fullmatch(r"(?:audio|asoc|snd|sound|codec|dsp)[A-Za-z0-9_-]{0,30}",
+                                    name, re.I)]
+        result[root] = {"available": True,
+                        "audio_groups": sorted(filtered)[:24]}
+    return result
+
+
 def capture():
     if platform.machine().lower() != "aarch64":
         failure("EXPECTED_LG_AARCH64")
@@ -263,6 +281,7 @@ def capture():
             "asoc": pathlib.Path("/sys/kernel/debug/asoc").is_dir(),
             "trace_events": pathlib.Path("/sys/kernel/tracing/events").is_dir(),
         },
+        "audio_debug_groups": audio_diag_groups(),
         "dts_pcm_waveform": "NOT_MEASURED",
         "native_dts_caps_segment": "NOT_MEASURED",
         "acoustic_state": "UNCLASSIFIED",
