@@ -150,7 +150,7 @@ def selftest():
     r = accumulator([tone])
     assert r["classification"] == "NONZERO_PCM"
     assert r["nonzero_sample_count"] == 400
-    assert -18 < r["rms_dbfs"] < -17
+    assert -15.2 < r["rms_dbfs"] < -14.9
     assert EXPECTED_SOURCE.fullmatch(
         "1\tpcm_output.monitor\tmodule-alsa-sink.c\ts16le 2ch 48000Hz\tIDLE")
     assert not EXPECTED_SOURCE.fullmatch(
