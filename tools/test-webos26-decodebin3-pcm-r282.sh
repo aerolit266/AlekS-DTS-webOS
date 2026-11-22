@@ -9,7 +9,7 @@ export LC_ALL
 root=/var/lib/webosbrew/aleks-dts-r278
 base=/usr/lib/gstreamer-1.0:/mnt/lg/res/lglib/gstreamer-1.0
 fail() { printf 'BLOCKED: %s\n' "$*" >&2; exit 1; }
-for tool in sha256sum mktemp timeout grep sed gst-launch-1.0 gst-inspect-1.0; do
+for tool in sha256sum mktemp timeout grep sed date gst-launch-1.0 gst-inspect-1.0; do
   command -v "$tool" >/dev/null 2>&1 || fail "Tool missing: $tool"
 done
 [ -f "$root/ready" ] && [ -f "$root/installed.sha256" ] || fail 'R278 not installed'
@@ -53,6 +53,7 @@ for mode in db3_stock db3_lg db3_aleks db3_aleks_pcm2; do
     db3_aleks|db3_aleks_pcm2) ranks='aleksdts16dec:350,decproxy:300' ;;
   esac
   logfile="$work/$mode.log"
+  started=$(date +%s)
   if [ "$mode" = db3_aleks_pcm2 ]; then
     run "$ranks" gst-launch-1.0 -v filesrc "location=$fixture" \
        '!' matroskademux name=dm dm.audio_0 '!' queue '!' decodebin3 \
@@ -63,6 +64,8 @@ for mode in db3_stock db3_lg db3_aleks db3_aleks_pcm2; do
        '!' matroskademux name=dm dm.audio_0 '!' queue '!' decodebin3 \
        '!' fakesink sync=false >"$logfile" 2>&1 && code=0 || code=$?
   fi
+  ended=$(date +%s)
+  elapsed=$((ended-started))
   if grep -Fq 'AlekSDts16DecBin' "$logfile"; then decoder=yes; else decoder=no; fi
   if grep -Fq 'Got EOS' "$logfile"; then eos=yes; else eos=no; fi
   if grep 'GstFakeSink:.*GstPad:sink: caps = audio/x-raw' "$logfile" | grep -Fq 'channels=(int)6'; then pcm6=yes; else pcm6=no; fi
@@ -71,6 +74,16 @@ for mode in db3_stock db3_lg db3_aleks db3_aleks_pcm2; do
   if grep -Eiq 'not-negotiated|not-linked|Internal data stream error' "$logfile"; then failed_caps=yes; else failed_caps=no; fi
   printf 'CASE=%s ranks=%s exit=%s DTS_DECODER=%s EOS=%s PCM6=%s PCM_S32LE=%s PCM2=%s NEGOTIATION_ERROR=%s\n' \
     "$mode" "$ranks" "$code" "$decoder" "$eos" "$pcm6" "$s32" "$stereo" "$failed_caps"
+  if grep -Fq 'Setting pipeline to NULL' "$logfile"; then null_seen=yes; else null_seen=no; fi
+  if grep -Fq 'Freeing pipeline' "$logfile"; then free_seen=yes; else free_seen=no; fi
+  # If the wrapper returns 143 approximately at its own 12s deadline,
+  # BusyBox timeout expiry is a possible origin, never a proven one.
+  deadline_compatible=no
+  if [ "$code" -eq 143 ] && [ "$elapsed" -ge 11 ]; then
+    deadline_compatible=yes
+  fi
+  printf 'LIFECYCLE=%s elapsed_wall_s=%s timeout_limit_s=12 null_transition_seen=%s pipeline_free_seen=%s deadline_compatible=%s\n' \
+    "$mode" "$elapsed" "$null_seen" "$free_seen" "$deadline_compatible"
   cases_total=$((cases_total+1))
   expected_pcm=no
   if [ "$mode" = db3_aleks_pcm2 ]; then
@@ -84,7 +97,7 @@ for mode in db3_stock db3_lg db3_aleks db3_aleks_pcm2; do
     echo "CASE_VERDICT=$mode CLEAN_EXIT_AND_DECODE_PASS"
   elif [ "$code" -eq 143 ]; then
     cases_signaled=$((cases_signaled+1))
-    echo "CASE_VERDICT=$mode SIGTERM_EXIT_143; EOS_ONLY_DOES_NOT_PROVE_CLEAN_TEARDOWN"
+    echo "CASE_VERDICT=$mode SIGTERM_EXIT_143; BUSYBOX_TIMEOUT_MAY_RETURN_143; CAUSE_UNPROVEN"
   elif [ "$code" -eq 124 ]; then
     echo "CASE_VERDICT=$mode TIMEOUT_EXIT_124; CHECK_LG_TIMEOUT_SEMANTICS"
   else
