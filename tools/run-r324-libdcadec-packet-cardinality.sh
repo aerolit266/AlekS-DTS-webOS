@@ -35,20 +35,37 @@ timeout 65 make -s -C "$tmp/dcadec" -j2 lib >"$tmp/compile.log" 2>&1 || {
     exit 2
 }
 echo R324_LIBDCADEC_BUILD_PASS
-tar -xOzf "$release" fixtures/dts-stereo.mka >"$tmp/dts-stereo.mka"
-printf '%s  %s\n' \
-    7b49fee09f78add1fb27afd404dc7ec229f4950e5803c081e1068b6d245587ae \
-    "$tmp/dts-stereo.mka" | sha256sum -c - >/dev/null
-# The exact public fixture contains 94 independent 1024-byte DTS Core
-# packets. Recover *only this SHA256-pinned fixture's* frame payloads with
-# Python stdlib; verify the encoded output against independent FFmpeg
-# stream-copy SHA256 (measured during R324 on VPS). No codec tools needed.
-python3 - "$tmp/dts-stereo.mka" "$tmp/dts-encoded.raw" <<'PY'
+# Only these immutable R278 fixtures are in scope. The reconstructed
+# encoded DTS raw SHA values were cross-checked against FFmpeg stream-copy.
+for track in stereo surround_51; do
+    case "$track" in
+        stereo)
+            file=dts-stereo.mka
+            fixture_sha=7b49fee09f78add1fb27afd404dc7ec229f4950e5803c081e1068b6d245587ae
+            raw_sha=282d15e11221524f6af40f4202ec6d2a3813d2a12a49de904e7cdfc0c4ce9bda
+            frame_bytes=1024
+            set --
+            ;;
+        surround_51)
+            file=dts-51.mka
+            fixture_sha=7f9ed29c1ea9e6493d1977590a8506e432897f2eabd29ef2d7fc1ef48a4af6b5
+            raw_sha=8897677d593a5710b62f90919fe0e9888a31621bf55b166e2294a2f36f4fb013
+            frame_bytes=2048
+            set -- -DR324_SURROUND_51
+            ;;
+    esac
+    tar -xOzf "$release" "fixtures/$file" >"$tmp/input.mka"
+    printf '%s  %s\n' "$fixture_sha" "$tmp/input.mka" |
+        sha256sum -c - >/dev/null
+    python3 - "$tmp/input.mka" "$tmp/dts-encoded.raw" \
+        "$frame_bytes" "$raw_sha" <<'PY'
 import hashlib
 from pathlib import Path
 import sys
 
 source = Path(sys.argv[1]).read_bytes()
+frame_bytes = int(sys.argv[3])
+assert frame_bytes in (1024, 2048)
 sync = bytes.fromhex("7ffe8001")
 positions = []
 offset = 0
@@ -58,17 +75,18 @@ while True:
         break
     positions.append(index)
     offset = index + len(sync)
-if len(positions) != 94 or any(k + 1024 > len(source) for k in positions):
+if len(positions) != 94 or any(k + frame_bytes > len(source)
+                                 for k in positions):
     raise SystemExit("R324_MATROSKA_FRAME_COUNT_MISMATCH")
-encoded = b"".join(source[k:k + 1024] for k in positions)
-digest = hashlib.sha256(encoded).hexdigest()
-if digest != "282d15e11221524f6af40f4202ec6d2a3813d2a12a49de904e7cdfc0c4ce9bda":
+encoded = b"".join(source[k:k + frame_bytes] for k in positions)
+if hashlib.sha256(encoded).hexdigest() != sys.argv[4]:
     raise SystemExit("R324_ENCODED_DTS_REFERENCE_SHA_MISMATCH")
 Path(sys.argv[2]).write_bytes(encoded)
 print("R324_FFMPEG_INDEPENDENT_RAW_SHA=PASS")
 PY
-gcc -std=c11 -O2 -Wall -Wextra -Werror \
-    -I"$tmp/dcadec" "$src" "$tmp/dcadec/libdcadec/libdcadec.a" \
-    -lm -o "$tmp/probe"
-timeout 15 "$tmp/probe" "$tmp/dts-encoded.raw"
+    gcc -std=c11 -O2 -Wall -Wextra -Werror "$@" \
+        -I"$tmp/dcadec" "$src" "$tmp/dcadec/libdcadec/libdcadec.a" \
+        -lm -o "$tmp/probe"
+    timeout 15 "$tmp/probe" "$tmp/dts-encoded.raw"
+done
 echo R324_LAB_ISOLATED_ONLY=PASS
