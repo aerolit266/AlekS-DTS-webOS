@@ -29,3 +29,5 @@ jobs:
           persist-credentials: false
       - name: Validate DTS release hashes, installers, source syntax and links
         run: python3 tools/audit-public-github-r322.py
+      - name: Validate exact released libdcadec DTS packet cardinality
+        run: sh tools/run-r324-libdcadec-packet-cardinality.sh
