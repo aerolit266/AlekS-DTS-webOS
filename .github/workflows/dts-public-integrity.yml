@@ -160,3 +160,17 @@ jobs:
           assert 'system(' not in src
           print('RESULT=R340_OFFDEVICE_MODEL_NO_PRODUCTION_ACTION_PASS')
           PY
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path('tools/r340-gstreamer-resource-grant-event-qa.c').read_text()
+          for symbol in ('gst_event_new_custom', 'GST_EVENT_CUSTOM_DOWNSTREAM',
+                         'gst_event_ref', 'gst_pad_push_event', 'gst_pad_link',
+                         'gst_pad_unlink', 'gst_event_unref',
+                         'R340_GST_PAD_EVENT_CONTRACT'):
+              assert symbol in src, symbol
+          for forbidden in ('gst_element_factory_make("rtkalsasink"',
+                            'gst_element_factory_make("rasink"',
+                            'system(', 'fork('):
+              assert forbidden not in src, forbidden
+          print('RESULT=R340_GST_ISOLATED_SOURCE_CONTRACT_PASS')
+          PY
