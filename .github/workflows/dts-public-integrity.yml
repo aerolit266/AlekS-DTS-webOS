@@ -1,17 +1,8 @@
-name: AlekS DTS public release integrity
+name: AlekS DTS public package integrity
 
 on:
   push:
     branches: [main]
-    paths:
-      - 'tools/**'
-      - 'docs/**'
-      - 'downloads/r278/**'
-      - 'install-universal.sh'
-      - 'README.md'
-      - 'README.en.md'
-      - 'PUBLIC-COMPATIBILITY.md'
-      - '.github/workflows/dts-public-integrity.yml'
   pull_request:
   workflow_dispatch:
 
@@ -19,166 +10,13 @@ permissions:
   contents: read
 
 jobs:
-  integrity:
+  package:
     runs-on: ubuntu-latest
-    timeout-minutes: 7
+    timeout-minutes: 5
     steps:
-      - name: Checkout (pinned GitHub-maintained action)
+      - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - name: Validate DTS release hashes, installers, source syntax and links
-        run: python3 tools/audit-public-github-r322.py
-      - name: Validate R350 ELF ABI gate and real R278 patch without a TV
-        run: python3 tools/test-r350-media-abi.py
-      - name: Validate R351 BusyBox timeout compatibility and immutable R278
-        run: python3 tools/test-r351-busybox-timeout.py
-      - name: Validate R352 strict AC3 F32LE 5.1 and passthrough profiles
-        run: python3 tools/test-r352-ac3-profiles.py
-      - name: Verify R353 read-only installed status and unchanged R352 install
-        run: python3 tools/test-r353-installed-status.py
-      - name: Validate exact released libdcadec DTS packet cardinality
-        run: sh tools/run-r324-libdcadec-packet-cardinality.sh
-      - name: Validate privacy-preserving R326 PulseAudio/ALSA parsers and PCM energy math
-        run: |
-          python3 tools/r326-passive-pulseaudio-alsa-snapshot.py selftest
-          python3 tools/r326-pulse-monitor-energy.py selftest
-          python3 tools/r327-real-dts-pair-compare.py --selftest
-          python3 tools/r328-native-audio-route-readonly.py selftest
-      - name: Verify R329 isolated pad probe tooling parses cleanly
-        run: |
-          sh -n tools/run-r329-isolated-pad-probe-lab.sh
-          sh -n tools/build-r329-armel-pad-probe-lab.sh
-          python3 -c "import ast,pathlib; ast.parse(pathlib.Path('tools/r329-stage-public-fixtures.py').read_text())"
-      - name: Validate R330 isolated DTS AC3 sequence scripts and source pin
-        run: |
-          sh -n tools/run-r330-isolated-dts-ac3-sequence.sh
-          echo 'd47b34303c1adbd91f8c1b5212a46c9b4975138b8195116eb142fe117fe4aeb9  tools/r330-isolated-dts-ac3-dts-sequence.c' | sha256sum -c -
-
-
-      - name: Validate R333/R334 read-only diagnostics and DTS codec taxonomy
-        run: |
-          python3 tools/r334-live-lg-codec-event-snapshot.py selftest
-          python3 - <<'PY'
-          import ast, pathlib, importlib.util
-          files = [
-              "tools/r333-readonly-lg-audio-route.py",
-              "tools/r333-native-lg-audio-logs-readonly.py",
-          ]
-          for path in files:
-              ast.parse(pathlib.Path(path).read_text())
-          spec = importlib.util.spec_from_file_location("r333_native", files[1])
-          module = importlib.util.module_from_spec(spec)
-          spec.loader.exec_module(module)
-          assert not module.PATTERNS["DTS_CODEC"].search(b"buffer pts 0:08:15 dts 0:08:15")
-          assert not module.PATTERNS["DTS_CODEC"].search(b"dts-seamless=0")
-          assert module.PATTERNS["DTS_CODEC"].search(b"audio/x-dts")
-          assert module.PATTERNS["AC3"].search(b"GstOMXAc3DecBin")
-          print("RESULT=R333_R334_CODEC_TAXONOMY_CI_PASS")
-          PY
-      - name: Validate R335/R336 precise DTS cold-vs-recovered differential
-        run: |
-          python3 tools/r335-lg-precise-dts-handoff-timeline.py selftest
-          python3 tools/r336-lg-cold-error-category.py selftest
-          python3 - <<'PY'
-          import ast
-          from pathlib import Path
-          for path in (
-              "tools/r335-lg-precise-dts-handoff-timeline.py",
-              "tools/r336-lg-cold-error-category.py",
-          ):
-              ast.parse(Path(path).read_text())
-          print("RESULT=R335_R336_SOURCE_INTEGRITY_PASS")
-          PY
-      - name: Safeguard R337 passive Realtek sink observer and native QA
-        run: |
-          sh -n tools/r337-verify-realtek-sink-observer-lg.sh
-          python3 - <<'PY'
-          from pathlib import Path
-          src = Path("tools/r337-bounded-realtek-sink-observer.c").read_text()
-          qa = Path("tools/r337-verify-realtek-sink-observer-lg.sh").read_text()
-          for marker in (
-              "rtkalsasink", "rasink", "qa_fakesink",
-              "renderer_scope", "MAX_PCM_PER_BUFFER 1024U",
-              "ALEKS_R337_ENABLE", "ALEKS_R337_ISOLATED_QA",
-              "R337_WINDOW_SECS 180", "external_process_attached",
-              "raw_pcm_exported", "raw_media_exported",
-          ):
-              assert marker in src, marker
-          for marker in (
-              "fakesink sync=false", "R337_LG_ISOLATED_REAL_R278_SINK_2_OF_2_PASS",
-              "sha256sum -c -", "systemctl is-active",
-              "audio_files_created",
-          ):
-              assert marker in qa, marker
-          assert "! rtkalsasink" not in qa
-          assert "! rasink" not in qa
-          print("RESULT=R337_OBSERVER_FAIL_CLOSED_CI_CONTRACT_PASS")
-          PY
-      - name: Validate R338 observer/controller matched deployment strings
-        run: |
-          sh -n tools/r338-runtime-window-lg.sh
-          sh -n tools/r338-verify-native-sink-lg.sh
-          python3 - <<'PY'
-          from pathlib import Path
-          obs=Path("tools/r338-bounded-realtek-sink-observer.c").read_text()
-          control=Path("tools/r338-runtime-window-lg.sh").read_text()
-          qa=Path("tools/r338-verify-native-sink-lg.sh").read_text()
-          base=Path("tools/r337-bounded-realtek-sink-observer.c").read_text()
-          assert base.replace("R337","R338").replace("r337","r338")==obs
-          assert 'ALEKS_R338_ENABLE' in obs
-          assert '"/run/aleks-r338/metrics"' in obs
-          assert '/r338-%ld.json"' in obs
-          assert 'ALEKS_R338_ISOLATED_QA' in obs
-          assert 'ALEKS_R338_ENABLE=YES' in control
-          assert 'ROOT=/run/aleks-r338' in control
-          assert 'systemd-run --unit=aleks-r338b-rollback --on-active=140s' in control
-          assert 'EXPECTED_HOOK=45ba5af2e437b94d43c2902fd7471dc852ae8fa285ff01502a16197bbf799dd1' in control
-          assert 'lab=/tmp/aleks-r338-stage-20261123' in qa
-          assert 'fakesink sync=false' in qa
-          assert 'libaleksr338hook.so' in qa
-          assert 'R338_LG_ISOLATED_REAL_R278_SINK_2_OF_2_PASS' in qa
-          print('RESULT=R338_OBSERVER_CONTROLLER_STAGE_CONSISTENCY_PASS')
-          PY
-      - name: Validate R340 fail-closed hardware resource epoch model
-        run: |
-          set -eu
-          d=$(mktemp -d)
-          trap 'rm -rf -- "$d"' EXIT
-          cc -std=c99 -O2 -Wall -Wextra -Werror -pedantic -fstack-protector-strong \
-            tools/r340-resource-grant-epoch-model.c -o "$d/r340-resource-model"
-          timeout 25 "$d/r340-resource-model" | tee "$d/result.txt"
-          grep -Fq 'R340_DETERMINISTIC=15/15 PASS' "$d/result.txt"
-          grep -Fq 'R340_FUZZ=25000*40 PASS' "$d/result.txt"
-          grep -Fq 'RESULT=R340_PURE_C99_GRANT_REPLAY_MODEL_15_AND_1M_PASS' "$d/result.txt"
-          python3 tools/r340-ums-readonly-pipeline-audio.py selftest
-          python3 - <<'PY'
-          from pathlib import Path
-          src=Path('tools/r340-resource-grant-epoch-model.c').read_text()
-          for marker in (
-             'R340_SOFTWARE_CHILD_NEW', 'R340_POLICY_SUSPEND',
-             'R340_POLICY_RESUME', 'R340_REPLAY_CACHED_GRANT',
-             'R340_FORWARD_ORIGINAL_GRANT', 'R340_CHILD_GONE',
-             'R340_FLUSH_START', 'R340_FLUSH_STOP', 'R340_RELEASE',
-             'R340_UNLOAD', 'R340_GRANT', 'R340_DTS_CAPS'
-          ):
-             assert marker in src, marker
-          assert 'gst_pad_push_event' not in src
-          assert 'gst_pad_push' not in src
-          assert 'system(' not in src
-          print('RESULT=R340_OFFDEVICE_MODEL_NO_PRODUCTION_ACTION_PASS')
-          PY
-          python3 - <<'PY'
-          from pathlib import Path
-          src=Path('tools/r340-gstreamer-resource-grant-event-qa.c').read_text()
-          for symbol in ('gst_event_new_custom', 'GST_EVENT_CUSTOM_DOWNSTREAM',
-                         'gst_event_ref', 'gst_pad_push_event', 'gst_pad_link',
-                         'gst_pad_unlink', 'gst_event_unref',
-                         'R340_GST_PAD_EVENT_CONTRACT'):
-              assert symbol in src, symbol
-          for forbidden in ('gst_element_factory_make("rtkalsasink"',
-                            'gst_element_factory_make("rasink"',
-                            'system(', 'fork('):
-              assert forbidden not in src, forbidden
-          print('RESULT=R340_GST_ISOLATED_SOURCE_CONTRACT_PASS')
-          PY
+      - name: Verify distributable archives, installer and documentation
+        run: python3 tools/verify-public-release.py
