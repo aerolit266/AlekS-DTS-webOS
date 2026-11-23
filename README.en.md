@@ -13,7 +13,7 @@ To check the already-installed TV via root SSH (**do not reinstall**):
 ```sh
 cd /tmp &&
 curl -fLsS 'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/59a725f96323ba3e32dd9ca5e20c3ad64c75dee9/install-universal.sh' -o aleks-dts-r353.sh &&
-printf '%s  %s\\n' '8b370958cf55b84ae3f33c28cd42a6d87759b6540649e0cfe661f233cec723d8' aleks-dts-r353.sh | sha256sum -c - &&
+printf '%s  %s\n' '8b370958cf55b84ae3f33c28cd42a6d87759b6540649e0cfe661f233cec723d8' aleks-dts-r353.sh | sha256sum -c - &&
 sh aleks-dts-r353.sh status
 ```
 
