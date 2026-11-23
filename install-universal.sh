@@ -12,7 +12,7 @@ installed='/var/lib/webosbrew/aleks-dts-r278/install.sh'
 
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
-[ "$#" -eq 1 ] || fail 'Usage: sh install-universal.sh diagnose | verify | install | rollback'
+[ "$#" -eq 1 ] || fail 'Usage: sh install-universal.sh diagnose | status | verify | install | rollback'
 # R350: inspect the media executable ELF header, not the kernel uname.
 # Output is a closed set of statuses; this function is read-only.
 elf_media_abi() {
@@ -43,7 +43,95 @@ require_arm32_media() {
     done
 }
 
+# R353: read-only post-reboot integrity check. A PASS does not assert audio playback.
+installed_status_check() (
+    check_root=$1
+    check_config=$2
+    check_active=$3
+    failures=0
+    if [ -d "$check_root" ] && [ ! -L "$check_root" ] &&
+       [ "$(stat -c %u "$check_root" 2>/dev/null)" = 0 ] &&
+       [ -f "$check_root/ready" ] && [ ! -L "$check_root/ready" ]; then
+        printf 'READY=PASS\n'
+    else
+        printf 'READY=FAIL\n'
+        failures=1
+    fi
+    if [ -f "$check_root/installed.sha256" ] &&
+       [ ! -L "$check_root/installed.sha256" ] &&
+       [ -f "$check_root/installed.env" ] &&
+       [ ! -L "$check_root/installed.env" ] &&
+       (cd "$check_root" && sha256sum -c installed.sha256 >/dev/null 2>&1); then
+        printf 'INSTALLED_SHA256=PASS\n'
+    else
+        printf 'INSTALLED_SHA256=FAIL\n'
+        failures=1
+    fi
+    if [ "$check_active" = active ]; then
+        printf 'MEDIA_SERVICE=ACTIVE\n'
+    else
+        printf 'MEDIA_SERVICE=NOT_ACTIVE\n'
+        failures=1
+    fi
+    if [ -n "$check_config" ] && [ -f "$check_config" ] &&
+       [ ! -L "$check_config" ] &&
+       [ -f "$check_root/installed.env" ] &&
+       cmp -s "$check_root/installed.env" "$check_config"; then
+        printf 'ENV_MATCH=PASS\n'
+    else
+        printf 'ENV_MATCH=FAIL\n'
+        failures=1
+    fi
+    printf 'AUDIBLE_DTS=NOT_TESTED_BY_STATUS\n'
+    if [ "$failures" -eq 0 ]; then
+        printf 'RESULT=R353_STATUS_PASS\n'
+    else
+        printf 'RESULT=R353_STATUS_FAIL\n'
+    fi
+    exit "$failures"
+)
+
+status_installed() {
+    [ "$(id -u)" = 0 ] || fail 'Root SSH is required for installed status.'
+    command -v systemctl >/dev/null 2>&1 || fail 'systemctl is unavailable.'
+    unit_show=$(SYSTEMD_PAGER=cat systemctl --no-pager show umediaserver.service \
+        -p ActiveState -p EnvironmentFiles 2>/dev/null) ||
+        fail 'Cannot read umediaserver.service configuration.'
+    active_state=''
+    config_path=''
+    if printf '%s\n' "$unit_show" | grep -Fqx 'ActiveState=active'; then
+        active_state=active
+    fi
+    env_line=$(printf '%s\n' "$unit_show" | grep '^EnvironmentFiles=' | head -n 1) ||
+        fail 'EnvironmentFiles property unavailable.'
+    env_paths=${env_line#EnvironmentFiles=}
+    for entry in $env_paths; do
+        case "$entry" in
+            /*/umediaserver.env|-/*/umediaserver.env)
+                candidate=${entry#-}
+                case "$candidate" in
+                    *[!A-Za-z0-9._/-]*) fail 'Unsafe media environment-file path.' ;;
+                esac
+                case "$candidate" in
+                    /var/*|/etc/systemd/*) ;;
+                    *) fail 'Unexpected media environment-file location.' ;;
+                esac
+                if [ -n "$config_path" ] && [ "$config_path" != "$candidate" ]; then
+                    fail 'Ambiguous media environment-file paths.'
+                fi
+                config_path=$candidate
+                ;;
+        esac
+    done
+    [ -n "$config_path" ] || fail 'No supported umediaserver environment-file path.'
+    installed_status_check /var/lib/webosbrew/aleks-dts-r278 "$config_path" "$active_state"
+}
+
 case "$1" in
+    status)
+        status_installed
+        exit $?
+        ;;
     rollback)
         [ "$(id -u)" = 0 ] || fail 'Root SSH is required.'
         [ -f "$installed" ] && [ ! -L "$installed" ] || fail 'Installed rollback script not found.'
@@ -58,14 +146,14 @@ case "$1" in
             printf '%s: %s\n' "$media_bin" "$(elf_media_abi "$media_bin")"
         done
         printf '=== MEDIA SERVICE ===\n'
-        systemctl show umediaserver.service -p LoadState -p ActiveState -p FragmentPath -p DropInPaths -p EnvironmentFiles 2>&1 || :
+        SYSTEMD_PAGER=cat systemctl --no-pager show umediaserver.service -p LoadState -p ActiveState -p FragmentPath -p DropInPaths -p EnvironmentFiles 2>&1 || :
         printf '=== CONFIGURATION DIRECTORIES ===\n'
         for d in /var/systemd/system /var/systemd/system/env /etc/systemd/system /var/lib/webosbrew; do
             if [ -e "$d" ] || [ -L "$d" ]; then ls -ld "$d"; else printf 'MISSING %s\n' "$d"; fi
         done
         exit 0
         ;;
-    *) fail 'Usage: sh install-universal.sh diagnose | verify | install | rollback' ;;
+    *) fail 'Usage: sh install-universal.sh diagnose | status | verify | install | rollback' ;;
 esac
 
 [ "$(id -u)" = 0 ] || fail 'Root SSH is required.'
