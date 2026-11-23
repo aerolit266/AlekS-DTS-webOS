@@ -216,7 +216,7 @@ ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubuse
   curl -fLsS --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 60 \
     -o "$stage/install-universal.sh" \
     'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/c8d6a5606de8bee33efef4c7856f7aa124731380/install-universal.sh'
-  printf '%s  %s\n' 'c28698875ec45c89ecdca3513763a194e62007ac02aa8cf0f851015efffe92a5' "$stage/install-universal.sh" | sha256sum -c -
+  printf '%s  %s\n' '541a1b6ff33423768aeb14e7eee803c32b9c877148801953cd0b4f4456a4c6af' "$stage/install-universal.sh" | sha256sum -c -
   sh "$stage/install-universal.sh" install
 )
 ```
