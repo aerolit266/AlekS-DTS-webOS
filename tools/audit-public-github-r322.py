@@ -111,7 +111,10 @@ def check_sources():
            "rollback" in current and
            "verify_pipeline" not in current,  # must rely on unchanged R278 install.sh verification
            "UNIVERSAL_INSTALLER_GATE_DRIFT")
-    ensure("require_arm32_media" in current and "=== MEDIA ELF ABI" in current and\n           "[ \\"$(uname -m)\\" = armv7l ]" not in current,\n           "R350_NATIVE_MEDIA_ABI_GATE_MISSING")\n    print("R322_UNIVERSAL_INSTALLER_SHA_AND_GATES=PASS")
+    ensure("require_arm32_media" in current and "=== MEDIA ELF ABI" in current and
+           '[ "$(uname -m)" = armv7l ]' not in current,
+           "R350_NATIVE_MEDIA_ABI_GATE_MISSING")
+    print("R322_UNIVERSAL_INSTALLER_SHA_AND_GATES=PASS")
 
 
 def check_docs():
