@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """R353: read-only installed status health, does NOT access any LG or install."""
 import hashlib
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -14,11 +15,11 @@ def check(value, reason):
         raise AssertionError(reason)
 
 
-def run(shell, root, cfg, mode):
+def run(shell, root, cfg, mode, env):
     # Run only the read-only check function, with synthetic temporary paths.
     cmd = shell + '\ninstalled_status_check "$1" "$2" "$3"\n'
     return subprocess.run(["sh", "-c", cmd, "r353", str(root), str(cfg), mode],
-                          capture_output=True, text=True, timeout=6)
+                          capture_output=True, text=True, timeout=6, env=env)
 
 
 def main():
@@ -57,8 +58,29 @@ def main():
             lines.append(hashlib.sha256((root / name).read_bytes()).hexdigest() + "  " + name)
         (root / "installed.sha256").write_text("\n".join(lines) + "\n")
 
-        def outcome(expected, reason, sr=root, conf=cfg, state="active"):
-            res = run(shell, sr, conf, state)
+        # CI runners are not root. Override only the stat(1) owner report
+        # for this disposable synthetic fixture; the production root check remains intact.
+        bindir = temp / "testbin"
+        bindir.mkdir()
+        mock_stat = bindir / "stat"
+        mock_stat.write_text(
+            '#!/bin/sh\n'
+            'if [ "$1" = "-c" ] && [ "$2" = "%u" ] && [ "$3" = "$R353_FIXTURE_ROOT" ]; then\n'
+            '  if [ "${R353_FORCE_NONROOT:-0}" = "1" ]; then printf "1000\\n"; else printf "0\\n"; fi\n'
+            '  exit 0\n'
+            'fi\n'
+            'exec /usr/bin/stat "$@"\n'
+        )
+        mock_stat.chmod(0o700)
+        fixture_env = dict(os.environ)
+        fixture_env["R353_FIXTURE_ROOT"] = str(root)
+        fixture_env["PATH"] = str(bindir) + os.pathsep + fixture_env.get("PATH", "")
+
+        def outcome(expected, reason, sr=root, conf=cfg, state="active", owner_override=False):
+            env = fixture_env.copy()
+            if owner_override:
+                env["R353_FORCE_NONROOT"] = "1"
+            res = run(shell, sr, conf, state, env)
             check(res.returncode == expected, reason + "_EXIT_" + repr(res.stdout))
             return res.stdout
 
@@ -79,6 +101,7 @@ def main():
             failures += 1
 
         should_fail("INACTIVE", "MEDIA_SERVICE=NOT_ACTIVE", state="inactive")
+        should_fail("NON_ROOT_OWNER", "READY=FAIL", owner_override=True)
         (root / "ready").unlink()
         should_fail("NOT_READY", "READY=FAIL")
         (root / "ready").write_text("")
