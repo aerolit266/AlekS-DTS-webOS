@@ -2,6 +2,25 @@
 
 [English](README.en.md) · [Лицензия документации](LICENSE.md)
 
+## Подтверждено на LG 65NANO766QA — 23.11.2026
+
+**РАБОТАЕТ:** webOS22 / 7.5.7-23, прошивка 04.54.30, GStreamer 1.18.2. Владелец подтвердил `R352_verify_PASS` (DTS Stereo, DTS 5.1 и AC3 5.1), `R352_install_PASS`, `INSTALL_EXIT=0`, `READY=PASS` и **слышимый DTS 5.1 в Lampa сразу после полной перезагрузки — без предварительного выбора AC3**. Полевое наблюдение, не лабораторная имитация. Полный `ENV_MATCH=PASS`/повторная SHA-проверка после установки, eARC-раскладка 5.1, перемотка и многоразовый холодный старт **не подтверждены**. [Полный отчёт и границы доказательств](docs/R353_LG65NANO766QA_FIELD_SUCCESS_20261123.md).
+
+**R353, безопасное расширение универсального установщика:** новый режим `status` проверяет `READY`, `INSTALLED_SHA256`, `ENV_MATCH`, `MEDIA_SERVICE` после установки и перезагрузки. Он не скачивает R278, не меняет файлы, не перезапускает службы, не воспроизводит звук; поэтому `R353_STATUS_PASS` — **не доказательство слышимого DTS**. Проверки `verify/install/rollback` и оригинальный R278 сохранены. [Регрессии R353](tools/test-r353-installed-status.py).
+
+Проверка состояния на уже установленном LG (в root SSH, **без повторной установки**):
+
+```sh
+cd /tmp &&
+curl -fLsS 'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/59a725f96323ba3e32dd9ca5e20c3ad64c75dee9/install-universal.sh' -o aleks-dts-r353.sh &&
+printf '%s  %s\\n' '8b370958cf55b84ae3f33c28cd42a6d87759b6540649e0cfe661f233cec723d8' aleks-dts-r353.sh | sha256sum -c - &&
+sh aleks-dts-r353.sh status
+```
+
+**История R350–R352 ниже — записи на момент разработки; актуальный успешный полевой результат приведён выше.**
+
+
+
 **R352 (23.11.2026):** после успешных DTS Stereo/5.1 на LG 65NANO766QA (webOS22, GStreamer 1.18.2) обнаружен корректный альтернативный AC3 5.1 путь: `ac3parse → avdec_ac3 → F32LE`, 6 каналов, 48 кГц, `non-interleaved`, маска `0x0000000000000c0f`, EOS. Старый R278 ожидал только `S8` passthrough. R352 принимает **оба** строго проверенных варианта AC3, отвергает подключение DTS-плагинов к AC3; меняет только временную проверочную копию, не оригинальный архив. QA: 2 положительных и 13 отрицательных AC3 сценариев, SHA и syntax PASS. **Новый R352 на физическом LG ещё не проверен, установка запрещена до полного `verify`.** [Тест R352](tools/test-r352-ac3-profiles.py).
 
 **R351 (23.11.2026):** устранён отказ проверки на LG 65NANO766QA / webOS 7.5.7 / GStreamer 1.18.2 из-за BusyBox 1.31.1: оригинальный R278 использует неподдерживаемый параметр `timeout -t 20`. Новая обвязка строго проверяет исходный вызов и заменяет его **только во временной копии** на совместимый `timeout 20`. Добавлена проверка отказа при изменённом исходнике и явный код результата. Изолированные тесты пройдены; реальный DTS/AC3 `verify` на 65NANO766QA после исправления пока **не проверен**. [Тест совместимости BusyBox](tools/test-r351-busybox-timeout.py).
@@ -219,8 +238,8 @@ ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubuse
   trap 'rm -rf -- "$stage"' EXIT
   curl -fLsS --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 60 \
     -o "$stage/install-universal.sh" \
-    'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/4d8deb89445364c0ec6b2198344f8c09e25078c2/install-universal.sh'
-  printf '%s  %s\n' '189b756bc606827fcaddaead5e2b9e8f3f7201961215e959e2d3d9298c31b091' "$stage/install-universal.sh" | sha256sum -c -
+    'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/59a725f96323ba3e32dd9ca5e20c3ad64c75dee9/install-universal.sh'
+  printf '%s  %s\n' '8b370958cf55b84ae3f33c28cd42a6d87759b6540649e0cfe661f233cec723d8' "$stage/install-universal.sh" | sha256sum -c -
   sh "$stage/install-universal.sh" install
 )
 ```
