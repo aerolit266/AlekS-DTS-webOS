@@ -2,6 +2,8 @@
 
 [English](README.en.md) · [Лицензия документации](LICENSE.md)
 
+**R351 (23.11.2026):** устранён отказ проверки на LG 65NANO766QA / webOS 7.5.7 / GStreamer 1.18.2 из-за BusyBox 1.31.1: оригинальный R278 использует неподдерживаемый параметр `timeout -t 20`. Новая обвязка строго проверяет исходный вызов и заменяет его **только во временной копии** на совместимый `timeout 20`. Добавлена проверка отказа при изменённом исходнике и явный код результата. Изолированные тесты пройдены; реальный DTS/AC3 `verify` на 65NANO766QA после исправления пока **не проверен**. [Тест совместимости BusyBox](tools/test-r351-busybox-timeout.py).
+
 **R350 (23.11.2026):** установщик проверяет ELF32 little-endian ARM у `umediaserver` и `starfish-media-pipeline`, а не `uname -m`. Команда `diagnose` выводит ABI без изменений ТВ; `verify` выполняет оставшиеся изолированные проверки. LG **65NANO766QA / 04.54.30** ещё не проверен: не запускать `install` до результатов диагностики и `verify`. [Регрессии ABI](tools/test-r350-media-abi.py): 9/9 + проверка патча подлинного R278 PASS (без установки).
 
 > **R278: проверенные ARM32-библиотеки, но не универсальный бинарный патч для всех LG.** Оригинальный `install.sh` из архива привязан к модели **65NANO896PC / 03.60.96**. Отдельный [`install-universal.sh`](install-universal.sh) снимает только эту привязку при совместимости **ARM ELF32 / GStreamer** (включая ARM64-ядро с 32-битным медиатрактом), сохраняя проверки DTS/AC3, медиасервиса и отката. Для webOS 26 используется отдельный проверенный профиль; на неизвестных моделях сначала выполняйте диагностику, не установку. [Порядок установки](#как-установить).
@@ -215,8 +217,8 @@ ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubuse
   trap 'rm -rf -- "$stage"' EXIT
   curl -fLsS --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 60 \
     -o "$stage/install-universal.sh" \
-    'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/c8d6a5606de8bee33efef4c7856f7aa124731380/install-universal.sh'
-  printf '%s  %s\n' '541a1b6ff33423768aeb14e7eee803c32b9c877148801953cd0b4f4456a4c6af' "$stage/install-universal.sh" | sha256sum -c -
+    'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/6347866848ef5797d6c1ffe1e1300ec069d25626/install-universal.sh'
+  printf '%s  %s\n' '9d6f1ded427722423dccbeb789ef6dbd72ab862a10a9ca8893d2e51fe1b37b87' "$stage/install-universal.sh" | sha256sum -c -
   sh "$stage/install-universal.sh" install
 )
 ```
