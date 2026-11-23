@@ -4,7 +4,7 @@
 
 **R350 (2026-11-23):** the universal wrapper checks the actual on-disk `umediaserver` and `starfish-media-pipeline` ELF32 little-endian ARM ABI, not the kernel `uname -m`. It supports ARM64 kernels running ARM32 media executables, but an ARM64 media ABI remains blocked. `diagnose` is read-only; use `verify` before installation. LG 65NANO766QA / 04.54.30 is still untested. See [offline ABI regression](tools/test-r350-media-abi.py).
 
-> **R278: verified ARM32 decoder libraries, not a universal binary patch for every LG.** The original archive's `install.sh` is restricted to **65NANO896PC / 03.60.96**. A separate [`install-universal.sh`](install-universal.sh) removes that exact model gate on compatible **ARMv7/GStreamer** devices, retaining decoder and media-service checks. webOS 26 requires a separately validated integration profile. Unknown models must be diagnosed first. [Installation](#installation).
+> **R278: verified ARM32 decoder libraries, not a universal binary patch for every LG.** The original archive's `install.sh` is restricted to **65NANO896PC / 03.60.96**. A separate [`install-universal.sh`](install-universal.sh) removes that exact model gate when the native media ABI is **ARM ELF32 / GStreamer** (including ARM64 kernels running ARM32 media processes), retaining decoder and media-service checks. webOS 26 requires a separately validated integration profile. Unknown models must be diagnosed first. [Installation](#installation).
 
 **AlekS DTS R277** adds DTS Core decoding to the native LG webOS media pipeline. Support loads automatically when the TV starts. For the tested DTS 5.1 track, the native audio sink received six-channel PCM S16LE at 48 kHz.
 
