@@ -4,7 +4,7 @@
 Run from a checked-out AlekS-DTS-webOS repository root. Verifies archive/
 manifest/plugin SHA256, shell syntax, Python syntax, Markdown relative links,
 read-only triage links, documented immutable universal installer pin and
-historical/original R278 model gate. Does NOT run installation code, alter
+historical/original R278 model gate, and the updated R350 installer pin. Does NOT run installation code, alter
 production, download anything or read users' private data.
 """
 import hashlib
@@ -20,8 +20,8 @@ RELEASE = ROOT / "downloads/r278/AlekS-DTS-R278-65NANO896PC-03.60.96.tar.gz"
 RELINK = ROOT / "downloads/r278/R278-R56-LGPL-RELINK.tar.gz"
 NOTICES = ROOT / "downloads/r278/SOFTWARE-NOTICES.txt"
 MANIFEST = ROOT / "downloads/r278/SHA256SUMS"
-BOOTSTRAP_SHA = "9c3ce62eeadcd638968a72bd29b3aefbbe349425c0ef739c455ab50c61de3a48"
-BOOTSTRAP_COMMIT = "9b4d9132ccdf8a7ee226ea292c8a0b3eae5d4859"
+BOOTSTRAP_SHA = "541a1b6ff33423768aeb14e7eee803c32b9c877148801953cd0b4f4456a4c6af"
+BOOTSTRAP_COMMIT = "c8d6a5606de8bee33efef4c7856f7aa124731380"
 EXPECTED = {
     "AlekS-DTS-R278-65NANO896PC-03.60.96.tar.gz":
         "cafb3e014f407a4a0dda6bd50a0e4f983aa0b35ea1f53e705f504aed0a094ea1",
@@ -111,6 +111,9 @@ def check_sources():
            "rollback" in current and
            "verify_pipeline" not in current,  # must rely on unchanged R278 install.sh verification
            "UNIVERSAL_INSTALLER_GATE_DRIFT")
+    ensure("require_arm32_media" in current and "=== MEDIA ELF ABI" in current and
+           '[ "$(uname -m)" = armv7l ]' not in current,
+           "R350_NATIVE_MEDIA_ABI_GATE_MISSING")
     print("R322_UNIVERSAL_INSTALLER_SHA_AND_GATES=PASS")
 
 

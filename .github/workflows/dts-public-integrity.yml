@@ -29,7 +29,7 @@ jobs:
           persist-credentials: false
       - name: Validate DTS release hashes, installers, source syntax and links
         run: python3 tools/audit-public-github-r322.py
-      - name: Validate exact released libdcadec DTS packet cardinality
+      - name: Validate R350 ELF ABI gate and real R278 patch without a TV\n        run: python3 tools/test-r350-media-abi.py\n      - name: Validate exact released libdcadec DTS packet cardinality
         run: sh tools/run-r324-libdcadec-packet-cardinality.sh
       - name: Validate privacy-preserving R326 PulseAudio/ALSA parsers and PCM energy math
         run: |

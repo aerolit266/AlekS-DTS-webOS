@@ -2,7 +2,9 @@
 
 [English](README.en.md) · [Лицензия документации](LICENSE.md)
 
-> **R278: проверенные ARM32-библиотеки, но не универсальный бинарный патч для всех LG.** Оригинальный `install.sh` из архива привязан к модели **65NANO896PC / 03.60.96**. Отдельный [`install-universal.sh`](install-universal.sh) снимает только эту привязку на совместимых **ARMv7/GStreamer**, сохраняя проверки DTS/AC3, медиасервиса и отката. Для webOS 26 используется отдельный проверенный профиль; на неизвестных моделях сначала выполняйте диагностику, не установку. [Порядок установки](#как-установить).
+**R350 (23.11.2026):** установщик проверяет ELF32 little-endian ARM у `umediaserver` и `starfish-media-pipeline`, а не `uname -m`. Команда `diagnose` выводит ABI без изменений ТВ; `verify` выполняет оставшиеся изолированные проверки. LG **65NANO766QA / 04.54.30** ещё не проверен: не запускать `install` до результатов диагностики и `verify`. [Регрессии ABI](tools/test-r350-media-abi.py): 9/9 + проверка патча подлинного R278 PASS (без установки).
+
+> **R278: проверенные ARM32-библиотеки, но не универсальный бинарный патч для всех LG.** Оригинальный `install.sh` из архива привязан к модели **65NANO896PC / 03.60.96**. Отдельный [`install-universal.sh`](install-universal.sh) снимает только эту привязку при совместимости **ARM ELF32 / GStreamer** (включая ARM64-ядро с 32-битным медиатрактом), сохраняя проверки DTS/AC3, медиасервиса и отката. Для webOS 26 используется отдельный проверенный профиль; на неизвестных моделях сначала выполняйте диагностику, не установку. [Порядок установки](#как-установить).
 
 **AlekS DTS R277** добавляет декодирование DTS Core в штатный медиатракт LG webOS. При обычном включении телевизора поддержка загружается автоматически. Для проверенной дорожки DTS 5.1 медиаплеер получил PCM S16LE, 48 кГц, 6 каналов.
 
@@ -213,8 +215,8 @@ ares-novacom --device aleks-kitchen-root --run "curl -fLsS https://raw.githubuse
   trap 'rm -rf -- "$stage"' EXIT
   curl -fLsS --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 60 \
     -o "$stage/install-universal.sh" \
-    'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/9b4d9132ccdf8a7ee226ea292c8a0b3eae5d4859/install-universal.sh'
-  printf '%s  %s\n' '9c3ce62eeadcd638968a72bd29b3aefbbe349425c0ef739c455ab50c61de3a48' "$stage/install-universal.sh" | sha256sum -c -
+    'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/c8d6a5606de8bee33efef4c7856f7aa124731380/install-universal.sh'
+  printf '%s  %s\n' '541a1b6ff33423768aeb14e7eee803c32b9c877148801953cd0b4f4456a4c6af' "$stage/install-universal.sh" | sha256sum -c -
   sh "$stage/install-universal.sh" install
 )
 ```
