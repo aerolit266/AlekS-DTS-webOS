@@ -152,6 +152,15 @@ def check_docs():
                "UNPINNED_BOOTSTRAP_" + name)
         ensure("/main/install-universal.sh" not in text,
                "MUTABLE_BOOTSTRAP_" + name)
+        expected_status_format = ("printf '%s  %s" + chr(92) + "n' '" +
+                                  BOOTSTRAP_SHA +
+                                  "' aleks-dts-r353.sh | sha256sum -c -")
+        ensure(expected_status_format in text,
+               "R353_STATUS_SHA_FORMAT_MISSING_" + name)
+        double_escaped = ("printf '%s  %s" + chr(92) * 2 + "n' '" +
+                          BOOTSTRAP_SHA + "'")
+        ensure(double_escaped not in text,
+               "R353_STATUS_SHA_DOUBLE_BACKSLASH_" + name)
     print("R322_REPRODUCIBLE_BOOTSTRAP_AND_FIELD_STATUS=PASS")
 
 
