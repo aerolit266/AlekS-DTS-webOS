@@ -2,6 +2,25 @@
 
 [Русский](README.md) · [Documentation license](LICENSE.md)
 
+## Confirmed working on LG 65NANO766QA — 2026-11-23
+
+**FIELD PASS:** webOS22 / 7.5.7-23, firmware 04.54.30, GStreamer 1.18.2. Owner reported `R352_verify_PASS` (DTS stereo, DTS 5.1 and AC3 5.1), `R352_install_PASS`, `INSTALL_EXIT=0`, `READY=PASS`, and **audible DTS 5.1 in Lampa on the first selection following a full reboot without first switching to AC3**. This is owner-confirmed, not a developer-controlled measurement. Complete post-install `installed.sha256` and `ENV_MATCH` output, physical six-channel/eARC routing, seeking, extended playback and repeated cold boots remain **unverified**. [Field report with evidence limits](docs/R353_LG65NANO766QA_FIELD_SUCCESS_20261123.md).
+
+**R353 non-destructive universal installer addition:** `status` checks `READY`, `INSTALLED_SHA256`, `ENV_MATCH` and `MEDIA_SERVICE` with no download, installation or service restart. `R353_STATUS_PASS` validates these fields only, **not audible DTS**. Existing `verify/install/rollback` code and immutable R278 are preserved. [R353 regression](tools/test-r353-installed-status.py).
+
+To check the already-installed TV via root SSH (**do not reinstall**):
+
+```sh
+cd /tmp &&
+curl -fLsS 'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/59a725f96323ba3e32dd9ca5e20c3ad64c75dee9/install-universal.sh' -o aleks-dts-r353.sh &&
+printf '%s  %s\\n' '8b370958cf55b84ae3f33c28cd42a6d87759b6540649e0cfe661f233cec723d8' aleks-dts-r353.sh | sha256sum -c - &&
+sh aleks-dts-r353.sh status
+```
+
+**R350–R352 notes below describe earlier development stages; the current field result is above.**
+
+
+
 **R352 (2026-11-23):** LG 65NANO766QA isolated DTS stereo/5.1 both passed; its GStreamer 1.18.2 AC3 path selected `avdec_ac3` and produced F32LE 5.1 PCM at 48 kHz, layout non-interleaved and EOS, rather than the R278-only S8 passthrough expectation. The R352 temporary verifier now **strictly** accepts either documented AC3 profile, refuses misrouted AlekS DTS plugins and preserves original R278 SHA and rollback. Off-device QA passed (2 positive, 13 negative). **On-TV R352 verification and permanent install remain pending.** [R352 regression](tools/test-r352-ac3-profiles.py).
 
 **R351 (2026-11-23):** fixes the BusyBox 1.31.1 `timeout: invalid option -- 't'` failure observed during isolated verification on LG 65NANO766QA (webOS 7.5.7, GStreamer 1.18.2). The wrapper patches the **temporary** authentic R278 installer from `timeout -t 20` to portable `timeout 20` only when exactly one source occurrence matches. It does not modify the immutable R278 archive or the TV media service. Offline mock BusyBox/GNU and negative mutation tests pass; real DTS/AC3 verification on this model is still pending. [R351 regression](tools/test-r351-busybox-timeout.py).
@@ -217,8 +236,8 @@ Open root SSH on an LG ARMv7 TV and paste the full block. It downloads the pinne
   trap 'rm -rf -- "$stage"' EXIT
   curl -fLsS --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 60 \
     -o "$stage/install-universal.sh" \
-    'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/4d8deb89445364c0ec6b2198344f8c09e25078c2/install-universal.sh'
-  printf '%s  %s\n' '189b756bc606827fcaddaead5e2b9e8f3f7201961215e959e2d3d9298c31b091' "$stage/install-universal.sh" | sha256sum -c -
+    'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/59a725f96323ba3e32dd9ca5e20c3ad64c75dee9/install-universal.sh'
+  printf '%s  %s\n' '8b370958cf55b84ae3f33c28cd42a6d87759b6540649e0cfe661f233cec723d8' "$stage/install-universal.sh" | sha256sum -c -
   sh "$stage/install-universal.sh" install
 )
 ```

@@ -20,8 +20,8 @@ RELEASE = ROOT / "downloads/r278/AlekS-DTS-R278-65NANO896PC-03.60.96.tar.gz"
 RELINK = ROOT / "downloads/r278/R278-R56-LGPL-RELINK.tar.gz"
 NOTICES = ROOT / "downloads/r278/SOFTWARE-NOTICES.txt"
 MANIFEST = ROOT / "downloads/r278/SHA256SUMS"
-BOOTSTRAP_SHA = "189b756bc606827fcaddaead5e2b9e8f3f7201961215e959e2d3d9298c31b091"
-BOOTSTRAP_COMMIT = "4d8deb89445364c0ec6b2198344f8c09e25078c2"
+BOOTSTRAP_SHA = "8b370958cf55b84ae3f33c28cd42a6d87759b6540649e0cfe661f233cec723d8"
+BOOTSTRAP_COMMIT = "59a725f96323ba3e32dd9ca5e20c3ad64c75dee9"
 EXPECTED = {
     "AlekS-DTS-R278-65NANO896PC-03.60.96.tar.gz":
         "cafb3e014f407a4a0dda6bd50a0e4f983aa0b35ea1f53e705f504aed0a094ea1",
@@ -119,6 +119,10 @@ def check_sources():
     ensure("install.ac3-patched" in current and "R352_%s_PASS" in current and
            "AC3 decoded 5.1 PCM layout mismatch" in current,
            "R352_AC3_GUARD_MISSING")
+    ensure("installed_status_check" in current and "R353_STATUS_PASS" in current and
+           "AUDIBLE_DTS=NOT_TESTED_BY_STATUS" in current and
+           "SYSTEMD_PAGER=cat systemctl --no-pager" in current,
+           "R353_SAFE_STATUS_MISSING")
     print("R322_UNIVERSAL_INSTALLER_SHA_AND_GATES=PASS")
 
 
