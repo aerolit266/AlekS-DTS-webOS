@@ -35,6 +35,8 @@ jobs:
         run: python3 tools/test-r351-busybox-timeout.py
       - name: Validate R352 strict AC3 F32LE 5.1 and passthrough profiles
         run: python3 tools/test-r352-ac3-profiles.py
+      - name: Verify R353 read-only installed status and unchanged R352 install
+        run: python3 tools/test-r353-installed-status.py
       - name: Validate exact released libdcadec DTS packet cardinality
         run: sh tools/run-r324-libdcadec-packet-cardinality.sh
       - name: Validate privacy-preserving R326 PulseAudio/ALSA parsers and PCM energy math
