@@ -104,13 +104,12 @@ def main():
         should_fail("MISSING_SHA_MANIFEST", "INSTALLED_SHA256=FAIL")
         print(f"R353_STATUS_NEGATIVE_{failures}_OF_{failures}_PASS")
 
-    # Guard the old production path against accidental refactor.
-    import subprocess as sp
-    old = sp.run(["git", "show", "HEAD:install-universal.sh"],
-                 cwd=ROOT, capture_output=True, text=True, timeout=8, check=True).stdout
-    before = old.split("stage=$(mktemp -d", 1)[1]
-    after = source.split("stage=$(mktemp -d", 1)[1]
-    check(before == after, "KNOWN_GOOD_INSTALL_PATH_CHANGED")
+    # Pin the entire production install/verify/rollback logic to the exact
+    # R352 bytes, independent of checkout history, shallow clones or branch HEAD.
+    expected_tail_sha256 = "0ee848001b277aac188fc6cf3aa1a0a17710e22de8b6b7f878f42bad5cda7ef8"
+    tail = source.split("stage=$(mktemp -d", 1)[1]
+    check(hashlib.sha256(tail.encode()).hexdigest() == expected_tail_sha256,
+          "KNOWN_GOOD_R352_INSTALL_PATH_CHANGED")
     print("R353_LEGACY_INSTALL_VERIFY_CODE_UNCHANGED_PASS")
     print("RESULT=R353_READONLY_STATUS_QA_PASS")
 
