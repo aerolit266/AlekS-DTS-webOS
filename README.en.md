@@ -2,6 +2,8 @@
 
 [Русский](README.md) · [Documentation license](LICENSE.md)
 
+**R352 (2026-11-23):** LG 65NANO766QA isolated DTS stereo/5.1 both passed; its GStreamer 1.18.2 AC3 path selected `avdec_ac3` and produced F32LE 5.1 PCM at 48 kHz, layout non-interleaved and EOS, rather than the R278-only S8 passthrough expectation. The R352 temporary verifier now **strictly** accepts either documented AC3 profile, refuses misrouted AlekS DTS plugins and preserves original R278 SHA and rollback. Off-device QA passed (2 positive, 13 negative). **On-TV R352 verification and permanent install remain pending.** [R352 regression](tools/test-r352-ac3-profiles.py).
+
 **R351 (2026-11-23):** fixes the BusyBox 1.31.1 `timeout: invalid option -- 't'` failure observed during isolated verification on LG 65NANO766QA (webOS 7.5.7, GStreamer 1.18.2). The wrapper patches the **temporary** authentic R278 installer from `timeout -t 20` to portable `timeout 20` only when exactly one source occurrence matches. It does not modify the immutable R278 archive or the TV media service. Offline mock BusyBox/GNU and negative mutation tests pass; real DTS/AC3 verification on this model is still pending. [R351 regression](tools/test-r351-busybox-timeout.py).
 
 **R350 (2026-11-23):** the universal wrapper checks the actual on-disk `umediaserver` and `starfish-media-pipeline` ELF32 little-endian ARM ABI, not the kernel `uname -m`. It supports ARM64 kernels running ARM32 media executables, but an ARM64 media ABI remains blocked. `diagnose` is read-only; use `verify` before installation. LG 65NANO766QA / 04.54.30 is still untested. See [offline ABI regression](tools/test-r350-media-abi.py).
@@ -215,8 +217,8 @@ Open root SSH on an LG ARMv7 TV and paste the full block. It downloads the pinne
   trap 'rm -rf -- "$stage"' EXIT
   curl -fLsS --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 60 \
     -o "$stage/install-universal.sh" \
-    'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/6347866848ef5797d6c1ffe1e1300ec069d25626/install-universal.sh'
-  printf '%s  %s\n' '9d6f1ded427722423dccbeb789ef6dbd72ab862a10a9ca8893d2e51fe1b37b87' "$stage/install-universal.sh" | sha256sum -c -
+    'https://raw.githubusercontent.com/aerolit266/AlekS-DTS-webOS/4d8deb89445364c0ec6b2198344f8c09e25078c2/install-universal.sh'
+  printf '%s  %s\n' '189b756bc606827fcaddaead5e2b9e8f3f7201961215e959e2d3d9298c31b091' "$stage/install-universal.sh" | sha256sum -c -
   sh "$stage/install-universal.sh" install
 )
 ```
