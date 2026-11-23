@@ -200,6 +200,19 @@ awk -v replacement=platform.universal '
     { print }
     END { if (seen != 1 || skip) exit 70 }
 ' install.sh > install.patched || fail 'Cannot patch platform check safely.'
+# R351: stock R278 uses 'timeout -t 20', rejected by BusyBox 1.31.1.
+# Both BusyBox and GNU coreutils accept 'timeout 20 COMMAND'.
+# Rewrite exactly one pinned archive invocation in the temporary copy.
+awk '
+    /timeout -t 20 "\$@"/ {
+        seen++
+        sub(/timeout -t 20/, "timeout 20")
+    }
+    { print }
+    END { if (seen != 1) exit 70 }
+' install.patched > install.timeout-patched ||
+    fail 'Unexpected R278 timeout syntax; refusing an unverified patch.'
+mv install.timeout-patched install.patched
 sh -n install.patched || fail 'Patched installer has a shell syntax error.'
 if grep -Fq 'Unsupported model or firmware.' install.patched ||
    grep -Fq '46a353723ec66894596d9ce0822c3f2273422731ad0426fc6ff16beb349162bc' install.patched; then
@@ -223,4 +236,10 @@ mv install.patched install.sh
 chmod 0700 install.sh
 printf 'AlekS DTS R278 universal: model/firmware gate removed.\n'
 printf 'Hardware ABI and DTS/AC3 tests remain mandatory.\n'
-sh ./install.sh "$action"
+if sh ./install.sh "$action"; then
+    printf 'RESULT=R351_%s_PASS\n' "$action"
+else
+    result=$?
+    printf 'ERROR: R351 %s failed with exit code %s. Read the verification logs path above, if created.\n' "$action" "$result" >&2
+    exit "$result"
+fi
