@@ -13,6 +13,36 @@ installed='/var/lib/webosbrew/aleks-dts-r278/install.sh'
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
 [ "$#" -eq 1 ] || fail 'Usage: sh install-universal.sh diagnose | verify | install | rollback'
+# R350: inspect the media executable ELF header, not the kernel uname.
+# Output is a closed set of statuses; this function is read-only.
+elf_media_abi() {
+    target=$1
+    [ -r "$target" ] || { printf 'UNREADABLE\n'; return; }
+    command -v od >/dev/null 2>&1 || { printf 'UNKNOWN_NO_OD\n'; return; }
+    bytes=$(od -An -tu1 -N20 "$target" 2>/dev/null) || {
+        printf 'UNKNOWN_READ_ERROR\n'; return;
+    }
+    set -- $bytes
+    if [ "$#" -ne 20 ] || [ "$1" != 127 ] || [ "$2" != 69 ] ||
+       [ "$3" != 76 ] || [ "$4" != 70 ]; then
+        printf 'NOT_ELF\n'; return
+    fi
+    case "$5:$6:${19}:${20}" in
+        1:1:40:0) printf 'ARM32_LE\n' ;;
+        2:1:183:0) printf 'ARM64_LE\n' ;;
+        *) printf 'UNSUPPORTED_ELF\n' ;;
+    esac
+}
+
+require_arm32_media() {
+    for media_bin in /usr/sbin/umediaserver /usr/sbin/starfish-media-pipeline; do
+        [ -x "$media_bin" ] || fail "Native media executable missing: $media_bin. Run diagnose; no install attempted."
+        media_abi=$(elf_media_abi "$media_bin")
+        [ "$media_abi" = ARM32_LE ] ||
+            fail "Incompatible media ABI ($media_abi) at $media_bin; R278 needs 32-bit little-endian ARM MEDIA binaries, independent of kernel uname. Run diagnose; no install attempted."
+    done
+}
+
 case "$1" in
     rollback)
         [ "$(id -u)" = 0 ] || fail 'Root SSH is required.'
@@ -23,6 +53,10 @@ case "$1" in
     diagnose)
         printf '=== DEVICE ===\n'
         uname -m
+        printf '=== MEDIA ELF ABI (read-only) ===\n'
+        for media_bin in /usr/sbin/umediaserver /usr/sbin/starfish-media-pipeline /usr/lib/gstreamer-1.0/libgstrtkalsa.so; do
+            printf '%s: %s\n' "$media_bin" "$(elf_media_abi "$media_bin")"
+        done
         printf '=== MEDIA SERVICE ===\n'
         systemctl show umediaserver.service -p LoadState -p ActiveState -p FragmentPath -p DropInPaths -p EnvironmentFiles 2>&1 || :
         printf '=== CONFIGURATION DIRECTORIES ===\n'
@@ -35,7 +69,7 @@ case "$1" in
 esac
 
 [ "$(id -u)" = 0 ] || fail 'Root SSH is required.'
-[ "$(uname -m)" = armv7l ] || fail 'The existing R278 binary plugins are ARMv7-only. This TV requires a separately compiled package.'
+require_arm32_media
 for tool in curl sha256sum tar awk grep mktemp sh; do
     command -v "$tool" >/dev/null 2>&1 || fail "Missing tool: $tool"
 done
@@ -132,7 +166,19 @@ fi
 cat > platform.universal <<'PLATFORM'
 platform() {
     [ "$(id -u)" = 0 ] || fail 'Root is required.'
-    [ "$(uname -m)" = armv7l ] || fail 'R278 contains ARMv7-only plugins.'
+    # Recheck both real media binaries in the temporary R278 installer.
+    # Kernel aarch64 may run 32-bit Starfish/UMS. Never accept unknown/64-bit ELF.
+    command -v od >/dev/null 2>&1 || fail 'ELF header inspector od is missing.'
+    for media_bin in /usr/sbin/umediaserver /usr/sbin/starfish-media-pipeline; do
+        [ -x "$media_bin" ] || fail "Native media executable missing: $media_bin."
+        set -- $(od -An -tu1 -N20 "$media_bin" 2>/dev/null) ||
+            fail "Cannot read ELF header: $media_bin."
+        [ "$#" -eq 20 ] &&
+        [ "$1" = 127 ] && [ "$2" = 69 ] && [ "$3" = 76 ] && [ "$4" = 70 ] &&
+        [ "$5" = 1 ] && [ "$6" = 1 ] &&
+        [ "${19}" = 40 ] && [ "${20}" = 0 ] ||
+            fail "Media executable is not ELF32 little-endian ARM: $media_bin."
+    done
     [ -x /usr/sbin/umediaserver ] || fail 'Native umediaserver is not available.'
     [ -x /usr/sbin/starfish-media-pipeline ] || fail 'Native media pipeline is not available.'
     [ -x /usr/bin/gst-inspect-1.0 ] || fail 'GStreamer inspector is missing.'
