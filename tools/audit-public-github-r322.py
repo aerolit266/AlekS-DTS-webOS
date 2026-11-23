@@ -20,8 +20,8 @@ RELEASE = ROOT / "downloads/r278/AlekS-DTS-R278-65NANO896PC-03.60.96.tar.gz"
 RELINK = ROOT / "downloads/r278/R278-R56-LGPL-RELINK.tar.gz"
 NOTICES = ROOT / "downloads/r278/SOFTWARE-NOTICES.txt"
 MANIFEST = ROOT / "downloads/r278/SHA256SUMS"
-BOOTSTRAP_SHA = "541a1b6ff33423768aeb14e7eee803c32b9c877148801953cd0b4f4456a4c6af"
-BOOTSTRAP_COMMIT = "c8d6a5606de8bee33efef4c7856f7aa124731380"
+BOOTSTRAP_SHA = "9d6f1ded427722423dccbeb789ef6dbd72ab862a10a9ca8893d2e51fe1b37b87"
+BOOTSTRAP_COMMIT = "6347866848ef5797d6c1ffe1e1300ec069d25626"
 EXPECTED = {
     "AlekS-DTS-R278-65NANO896PC-03.60.96.tar.gz":
         "cafb3e014f407a4a0dda6bd50a0e4f983aa0b35ea1f53e705f504aed0a094ea1",
@@ -114,6 +114,8 @@ def check_sources():
     ensure("require_arm32_media" in current and "=== MEDIA ELF ABI" in current and
            '[ "$(uname -m)" = armv7l ]' not in current,
            "R350_NATIVE_MEDIA_ABI_GATE_MISSING")
+    ensure("install.timeout-patched" in current and "R351_%s_PASS" in current and
+           "timeout 20" in current, "R351_PORTABLE_TIMEOUT_PATCH_MISSING")
     print("R322_UNIVERSAL_INSTALLER_SHA_AND_GATES=PASS")
 
 
