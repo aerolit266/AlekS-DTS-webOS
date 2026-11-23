@@ -213,6 +213,70 @@ awk '
 ' install.patched > install.timeout-patched ||
     fail 'Unexpected R278 timeout syntax; refusing an unverified patch.'
 mv install.timeout-patched install.patched
+# R352: replace only the pinned R278 AC3 verifier call in temporary install.sh.
+# The untouched R278 used AC3 S8 passthrough only; some LG decoders output
+# genuine six-channel F32LE. Neither branch may select an AlekS DTS plugin.
+cat > ac3.compat <<'AC3'
+    check_ac3() {
+        out="$work/ac3-51.log"
+        run_gst /usr/bin/gst-launch-1.0 -v filesrc "location=$directory/fixtures/ac3-51.mka" \
+            '!' matroskademux name=dm dm.audio_0 '!' queue '!' decodebin '!' fakesink sync=false \
+            > "$out" 2>&1 || fail "AC3 playback failed. See $out"
+        grep -Fq 'Got EOS' "$out" || fail "AC3 EOS missing in $out."
+        if grep -Eq 'AlekSDtsR130:|AlekSDts16DecBin' "$out"; then
+            fail "DTS plugin incorrectly selected for AC3 in $out."
+        fi
+        caps=$(grep 'GstFakeSink:.*GstPad:sink: caps = audio/x-raw' "$out" | tail -1)
+        [ -n "$caps" ] || fail "AC3 output PCM caps missing in $out."
+        printf '%s\n' "$caps" | grep -Fq 'rate=(int)48000' ||
+            fail "AC3 sample rate mismatch in $out."
+        case "$caps" in
+            *'format=(string)S8,'*)
+                printf '%s\n' "$caps" |
+                    grep -F 'channels=(int)1,' |
+                    grep -Fq 'channel-mask=(bitmask)0x0000000000000000' ||
+                    fail "AC3 passthrough layout mismatch in $out."
+                printf '%s\n' "$caps" |
+                    grep -F 'mode:passthrough' |
+                    grep -Fq 'codec_type=(string)AC3' ||
+                    fail "AC3 passthrough metadata missing in $out."
+                printf 'PASS ac3-51 (passthrough)\n'
+                ;;
+            *'format=(string)F32LE,'*)
+                printf '%s\n' "$caps" |
+                    grep -F 'layout=(string)non-interleaved' |
+                    grep -F 'channels=(int)6,' |
+                    grep -Fq 'channel-mask=(bitmask)0x0000000000000c0f' ||
+                    fail "AC3 decoded 5.1 PCM layout mismatch in $out."
+                grep -E 'GstAc3Parse:.*GstPad:src: caps = audio/x-ac3' "$out" |
+                    grep -Fq 'channels=(int)6' ||
+                    fail "AC3 parser six-channel evidence missing in $out."
+                grep -E '/avdec_ac3:.*GstPad:src: caps = audio/x-raw' "$out" |
+                    grep -F 'format=(string)F32LE' |
+                    grep -F 'rate=(int)48000' |
+                    grep -F 'channels=(int)6' |
+                    grep -Fq 'channel-mask=(bitmask)0x0000000000000c0f' ||
+                    fail "AC3 decoder six-channel PCM evidence missing in $out."
+                printf 'PASS ac3-51 (decoded-F32LE-5.1)\n'
+                ;;
+            *) fail "Unsupported AC3 output PCM format in $out." ;;
+        esac
+    }
+    check_ac3
+AC3
+awk -v replacement=ac3.compat '
+    /^    check_clip ac3-51 S8 1 0x0000000000000000$/ {
+        count++
+        if (count != 1) exit 70
+        while ((getline line < replacement) > 0) print line
+        close(replacement)
+        next
+    }
+    { print }
+    END { if (count != 1) exit 70 }
+' install.patched > install.ac3-patched ||
+    fail 'Unexpected R278 AC3 verifier: refusing an unverified compatibility patch.'
+mv install.ac3-patched install.patched
 sh -n install.patched || fail 'Patched installer has a shell syntax error.'
 if grep -Fq 'Unsupported model or firmware.' install.patched ||
    grep -Fq '46a353723ec66894596d9ce0822c3f2273422731ad0426fc6ff16beb349162bc' install.patched; then
@@ -237,9 +301,9 @@ chmod 0700 install.sh
 printf 'AlekS DTS R278 universal: model/firmware gate removed.\n'
 printf 'Hardware ABI and DTS/AC3 tests remain mandatory.\n'
 if sh ./install.sh "$action"; then
-    printf 'RESULT=R351_%s_PASS\n' "$action"
+    printf 'RESULT=R352_%s_PASS\n' "$action"
 else
     result=$?
-    printf 'ERROR: R351 %s failed with exit code %s. Read the verification logs path above, if created.\n' "$action" "$result" >&2
+    printf 'ERROR: R352 %s failed with exit code %s. Read the verification logs path above, if created.\n' "$action" "$result" >&2
     exit "$result"
 fi
