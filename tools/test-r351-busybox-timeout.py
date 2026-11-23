@@ -33,7 +33,7 @@ def main():
     t_awk = re.search(r"awk '\n(.*?)\n' install.patched > install.timeout-patched", src, re.S)
     check(platform is not None and p_awk is not None and t_awk is not None,
           "R351_PINNED_SOURCE_PATCH_BLOCKS")
-    check("R351_%s_PASS" in src and "failed with exit code" in src,
+    check(any(("R%s_%%s_PASS" % v) in src for v in (351, 352)) and "failed with exit code" in src,
           "R351_RESULT_STATUS_REPORTING")
     check(run(["sh", "-n"], input=src.encode()).returncode == 0, "WRAPPER_SH_N")
     with tempfile.TemporaryDirectory(prefix="r351-qa-") as work:
