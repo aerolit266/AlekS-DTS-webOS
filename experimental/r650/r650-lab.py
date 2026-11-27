@@ -44,6 +44,8 @@ def verified_archive(path):
     return out
 
 def check_contents(out):
+    require(sha(out["SHA256SUMS"]) == "a401f12c79cc5ded3a06a9b85b53a923d8176914ad79288568b77b45528b4d79",
+            "manifest SHA256 mismatch")
     manifest = {}
     for line in out["SHA256SUMS"].decode("utf-8").splitlines():
         digest, name = line.split("  ", 1)
@@ -66,7 +68,7 @@ def read_stage(p):
     owned_dir(p)
     owned_dir(p / "payload")
     found = {str(f.relative_to(p)) for f in p.iterdir()}
-    require(found == (FILES - {n for n in FILES if "/" in n}) | {"payload"},
+    require(found == ((FILES - {n for n in FILES if "/" in n}) | {"payload"}),
             "unexpected stage entries")
     require({f.name for f in (p / "payload").iterdir()} ==
             {Path(n).name for n in FILES if "/" in n}, "unexpected payload entries")
